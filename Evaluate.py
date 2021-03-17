@@ -35,6 +35,8 @@ def battle(mode):
 
                 action_values, state_val = model(state)
 
+                print(state_val.numpy())
+
                 tau = 0.5
                 
                 action, prob = get_action(state, action_values, tau)

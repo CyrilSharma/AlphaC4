@@ -1,3 +1,5 @@
 venv/
 my_model/
 __pycache__/
+.vscode/
+.DS_Store/

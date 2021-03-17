@@ -1,12 +1,8 @@
 { 
-    "episodes": 1500,
-    "columns": 7,
-    "rows": 6,
-    "max_steps": 42,
+    "episodes": 500,
     "tau": 4.0,
     "gamma": 0.90,
     "alpha": 0.00001,
     "eps": 0.00000000000001,
-    "c_puct": 1,
-    "DEBUG": false
+    "c_puct": 1
 }

@@ -1,69 +1,156 @@
 import unittest
+import json
 import numpy as np
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers
 from kaggle_environments import evaluate, make, utils
 from ActorCritic import ActorCritic
-columns = 7
-rows = 6
+from C4_Helpers import convert_state, is_terminal, legal, move, unmove, render
+from MCTS import SearchTree, Node
 
+params = {
+    "episodes": 1500,
+    "tau": 1.0,
+    "gamma": 0.90,
+    "alpha": 0.00001,
+    "eps": 0.00000000000001,
+    "c_puct": 1
+}
+
+config = {
+    "rows": 6, 
+    "columns": 7, 
+    "inarow": 4,
+    "timeout": 2,
+    "debug": True
+}
+
+model = keras.models.load_model("my_model", compile=False)
 class Test_MCTS(unittest.TestCase):
 
-    def test_opposite_state(self):
+    def test_node(self):
+        print('Original state: ')
+        state = np.array([[0, 2, 0, 0, 0, 1, 0], [0, 1, 0, 0, 0, 2, 0], [0, 2, 0, 0, 0, 2, 0],
+        [0, 1, 0, 0, 1, 2, 0], [0, 1, 0, 1, 2, 1, 0], [0, 1, 2, 1, 2, 1, 0]])
+        render(state)
 
-        board = np.array([[0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0, 0], [0, 2, 0, 1, 2, 0, 0], [0, 1, 2, 1, 2, 0, 0]])
+        node = Node(state=state, action=1)
+        node.append_child(state=state, prob=0.7, action=2)
+        child = node.get_child(action=2)
 
-        state = tf.convert_to_tensor(np.array(board).reshape(1, rows, columns, 1))
-        state_opp = opposite_state(state)
-        board_opp = state_opp.numpy().squeeze()
+        move(state, child.action, 1)
 
-        board_answer = np.array([[0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0, 0], [0, 1, 0, 2, 1, 0, 0], [0, 2, 1, 2, 1, 0, 0]])
+        answer = np.array([[0, 2, 0, 0, 0, 1, 0], [0, 1, 0, 0, 0, 2, 0], [0, 2, 0, 0, 0, 2, 0],
+        [0, 1, 0, 0, 1, 2, 0], [0, 1, 1, 1, 2, 1, 0], [0, 1, 2, 1, 2, 1, 0]])
 
-        self.assertTrue((board_opp == board_answer).all())
+        print('Method returns: ')
+        render(state)
+        print('Answer: ')
+        render(answer)
+
+        self.assertTrue((state == answer).all())
     
-    def test_legal(self):
+    def test_MCTS_expand(self):
+        np.random.seed(42)
 
-        state = tf.convert_to_tensor(np.array([[0, 2, 0, 0, 0, 2, 0], [0, 1, 0, 0, 0, 1, 0], [0, 2, 0, 0, 0, 2, 0],
-        [0, 1, 0, 0, 1, 0, 0], [0, 2, 0, 1, 2, 0, 0], [0, 1, 2, 1, 2, 0, 0]]))
-        action_values = tf.convert_to_tensor(np.array([0, 2, 5, 0, 4, 2, 0]).reshape(1, columns))
-        legal_action_values, legal_actions = legal(state, action_values)
+        print('Original state: ')
+        state = np.array([[0, 2, 0, 0, 0, 1, 0], [0, 1, 0, 0, 0, 2, 0], [0, 2, 0, 0, 0, 2, 0],
+        [0, 1, 0, 0, 1, 2, 0], [0, 1, 0, 1, 2, 1, 0], [0, 1, 2, 1, 2, 1, 0]])
+        render(state)
 
-        legal_action_answers = np.array([0, 2, 3, 4, 6])
-        legal_action_value_answers = np.array([0, 5, 0, 4, 0])
+        tree = SearchTree(state=state, model=model, params=params, config=config)
 
-        self.assertTrue((legal_actions == legal_action_answers).all())
-        self.assertTrue((legal_action_values.numpy() == legal_action_value_answers).all())
+        node = Node(state=state, prob=0.7, action=1)
+        tree.expand(node)
 
+        num_children = len(list(node.children.values()))
+        
+        self.assertTrue(len(node.actions) == num_children)
     
-    def test_get_action(self):
 
-        tf.random.set_seed(42)
-        state = tf.convert_to_tensor(np.array([[0, 0, 0, 0, 0, 0, 0], [0, 1, 0, 0, 0, 1, 0], [0, 2, 0, 0, 0, 2, 0],
-        [0, 1, 0, 0, 1, 0, 0], [0, 2, 0, 1, 2, 0, 0], [0, 1, 2, 1, 2, 0, 0]]))
-        action_values = tf.convert_to_tensor(np.array([0, 2, 5, 0, 4, 2, 0]).reshape(1, columns))
+    def test_MCTS_backup(self):
+        state = np.array([[0, 2, 0, 0, 0, 1, 0], [0, 1, 0, 0, 0, 2, 0], [0, 2, 0, 0, 0, 2, 0],
+        [0, 1, 0, 0, 1, 2, 0], [0, 1, 0, 1, 2, 1, 0], [0, 1, 2, 1, 2, 1, 0]])
 
-        action_probs = tf.convert_to_tensor(np.array([0.000001, 1, 0.000001, 0.000001, 0.000001, 0.000001, 0.000001]).reshape(1, columns))
-        action_values = tf.math.log(action_probs)
+        tree = SearchTree(state=state, model=model, params=params, config=config)
 
+        node = Node(state=state, prob=0.7, action=1)
+        node.append_child(state=state, prob=0.7, action=1)
+        child = node.get_child(action=1)
+        child.append_child(state=state, prob=0.7, action=1)
+        grandchild = child.get_child(action=1)
 
-        tau = 1.0
+        tree.backup(grandchild, 1)
 
-        action, prob = get_action(state, action_values, tau)
+        self.assertTrue(node.reward == 1)
+        self.assertTrue(child.reward == -1)
+        self.assertTrue(grandchild.reward == 1)
+    
+    def test1_MCTS(self):
+        np.random.seed(42)
+        state = convert_state(np.array([[0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0],[0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0], [2, 2, 2, 1, 1, 1, 0]]))
 
-        self.assertTrue(action.numpy() == 1)
-        self.assertTrue(0.99 <= prob.numpy() <= 1)
+        print('Initial State: ')
+        render(state, [1, -1, 0])
 
-        action_probs = tf.convert_to_tensor(np.array([6, 1, 1, 1, 1, 1, 1], dtype=np.float32).reshape(1, columns))
-        action_values = tf.math.log(action_probs)
-        tau = 0.5
+        tree = SearchTree(state=state, model=model, params=params, config=config)
 
-        action, prob = get_action(state, action_values, tau)
+        # Note that it's always assumed to be player one's turn
+        action, prob, terminal = tree.MCTS()
 
-        self.assertTrue(action.numpy() == 0)
-        self.assertTrue(0.855 <= prob.numpy() <= 0.860)
+        print(tree)
+
+        self.assertTrue(action == 6)
+
+        state = convert_state(np.array([[0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0],[0, 0, 2, 1, 0, 0, 0], [0, 0, 2, 2, 1, 0, 0], [0, 0, 2, 1, 2, 1, 0]]))
+
+        print('Initial State: ')
+        render(state, [1, -1, 0])
+
+        tree = SearchTree(state=state, model=model, params=params, config=config)
+
+        # Note that it's always assumed to be player one's turn
+
+        action, prob, terminal = tree.MCTS()
+
+        print(tree)
+
+    def test2_MCTS(self):
+        np.random.seed(42)
+
+        config = {
+            "rows": 6, 
+            "columns": 7, 
+            "inarow": 4,
+            "timeout": 2,
+            "debug": True
+        }
+
+        state = convert_state(np.array([[0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0],[0, 0, 0, 0, 0, 0, 0], [0, 0, 2, 2, 0, 0, 0], [0, 0, 1, 1, 0, 0, 0]]))
+
+        print('Initial State: ')
+        render(state, [1, -1, 0])
+
+        tree = SearchTree(state=state, model=model, params=params, config=config)
+
+        # Note that it's always assumed to be player one's turn
+        action, prob, terminal = tree.MCTS()
+
+        print('Algorithmn chose: ', action)
+        print(tree)
+
+        tree.shift_root(1)
+
+        print(tree)
+
+        action, prob, terminal = tree.MCTS()
+        print('Algorithmn chose: ', action)
+        print(tree)
+
+        self.assertTrue(action == 5)
+    
+            
 
 if __name__ == '__main__':
     unittest.main()
