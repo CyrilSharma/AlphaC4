@@ -35,10 +35,10 @@ def is_win(state: np.ndarray, action: int):
     mark = state[row, action]
 
     return (
-        count(state, action, row, mark, 1, 0) >= INAROW  # vertical.
-        or (count(state, action, row, mark, 0, 1) + count(state, action, row, mark, 0, -1)) >= INAROW  # horizontal.
-        or (count(state, action, row, mark, -1, -1) + count(state, action, row, mark, 1, 1)) >= INAROW  # top left diagonal.
-        or (count(state, action, row, mark, -1, 1) + count(state, action, row, mark, 1, -1)) >= INAROW  # top right diagonal.
+        (count(state, action, row, mark, 1, 0)) >= INAROW - 1 # vertical.
+        or (count(state, action, row, mark, 0, 1) + count(state, action, row, mark, 0, -1)) >= (INAROW - 1)  # horizontal.
+        or (count(state, action, row, mark, -1, -1) + count(state, action, row, mark, 1, 1)) >= (INAROW - 1)  # top left diagonal.
+        or (count(state, action, row, mark, -1, 1) + count(state, action, row, mark, 1, -1)) >= (INAROW - 1)  # top right diagonal.
     )
 
 def is_terminal(state: np.ndarray, action: int) -> [float, bool]:
@@ -53,7 +53,7 @@ def is_terminal(state: np.ndarray, action: int) -> [float, bool]:
         reward = 1.0
         return reward, terminal
     
-    top_row = state[COLUMN_HEIGHT - 1, :]
+    top_row = state[0, :]
 
     if (np.count_nonzero(top_row) == ROW_LENGTH):
         terminal = True

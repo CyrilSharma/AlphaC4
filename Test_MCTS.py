@@ -15,7 +15,8 @@ params = {
     "gamma": 0.90,
     "alpha": 0.00001,
     "eps": 0.00000000000001,
-    "c_puct": 1
+    "c_puct": 1,
+    "cutoff": 0.05
 }
 
 config = {
@@ -97,7 +98,7 @@ class Test_MCTS(unittest.TestCase):
         tree = SearchTree(state=state, model=model, params=params, config=config)
 
         # Note that it's always assumed to be player one's turn
-        action, prob, terminal = tree.MCTS()
+        action, prob, terminal, win = tree.MCTS()
 
         print(tree)
 
@@ -112,11 +113,13 @@ class Test_MCTS(unittest.TestCase):
 
         # Note that it's always assumed to be player one's turn
 
-        action, prob, terminal = tree.MCTS()
+        action, prob, terminal, win = tree.MCTS()
 
         print(tree)
-
+    
     def test2_MCTS(self):
+        print('\nTest2')
+        print('_' * 30, '\n')
         np.random.seed(42)
 
         config = {
@@ -127,7 +130,7 @@ class Test_MCTS(unittest.TestCase):
             "debug": True
         }
 
-        state = convert_state(np.array([[0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0],[0, 0, 0, 0, 0, 0, 0], [0, 0, 2, 2, 0, 0, 0], [0, 0, 1, 1, 0, 0, 0]]))
+        state = convert_state(np.array([[0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 2, 0, 0],[0, 0, 0, 1, 1, 2, 1], [0, 0, 2, 1, 2, 1, 2], [0, 0, 2, 2, 1, 1, 1]]))
 
         print('Initial State: ')
         render(state, [1, -1, 0])
@@ -135,20 +138,51 @@ class Test_MCTS(unittest.TestCase):
         tree = SearchTree(state=state, model=model, params=params, config=config)
 
         # Note that it's always assumed to be player one's turn
-        action, prob, terminal = tree.MCTS()
+        action, prob, terminal, win = tree.MCTS()
 
         print('Algorithmn chose: ', action)
-        print(tree)
-
-        tree.shift_root(1)
 
         print(tree)
+        print('_' * 30)
+        self.assertTrue(action == 3)
+    
+    def test3_MCTS(self):
+        print('\nTest2')
+        print('_' * 30, '\n')
+        np.random.seed(42)
 
-        action, prob, terminal = tree.MCTS()
+        config = {
+            "rows": 6, 
+            "columns": 7, 
+            "inarow": 4,
+            "timeout": 2,
+            "debug": True
+        }
+
+        state = np.array(
+        [[-0., -0., -0., -0., -0., -0., -0.],
+        [-0., -0., -0., -0., -0., -0., -0.],
+        [ 1., -0., -0., -0.,  1., -0., -0.],
+        [-1., -0., -0., -0.,  1.,  1., -0.],
+        [-1., -0., -0., 0, -1., -1., -1.],
+        [ 1.,  1.,  1., -1.,  1., -1., -1.]]
+        )
+
+        print('Initial State: ')
+        render(state, [1, -1, 0])
+
+        tree = SearchTree(state=state, model=model, params=params, config=config)
+
+        # Note that it's always assumed to be player one's turn
+        action, probs, terminal, win = tree.MCTS()
+
+        print('Probs: ', probs)
+
         print('Algorithmn chose: ', action)
-        print(tree)
 
-        self.assertTrue(action == 5)
+        print(tree)
+        print('_' * 30)
+        self.assertTrue(action == 3)
     
             
 

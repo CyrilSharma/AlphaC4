@@ -6,14 +6,20 @@ import copy
 from C4_Helpers import convert_state, is_terminal, legal, move, unmove, render
 
 class SearchTree():
-    def __init__(self, state, model, params, config):
-        self.state = state
+    def __init__(self, model, params, config, state=None):
+        if state is None:
+            self.state = np.zeros((config['rows'], config['columns'])) 
+        else:
+            self.state = state
         self.model = model
+        self.columns = config['columns']
+        self.rows = config['rows']
         self.model_dims = (1, config['rows'], config['columns'], 1)
         self.root = Node(self.state)
         self.tau = params['tau']
         self.c = params['c_puct']
         self.steptime = config['timeout'] - 0.5
+        self.cutoff = params['cutoff']
 
     def model_call(self, state):
         action_vals, state_val = self.model(tf.convert_to_tensor(state.reshape(self.model_dims), dtype=tf.float32))
@@ -29,7 +35,6 @@ class SearchTree():
                 v = self.tree_policy(self.root)
                 delta = self.estimate_value(v)
                 self.backup(v, delta)
-                #print(self.root.get_child(1).reward, self.root.get_child(1).visits)
             return self.final_action()
     
     def estimate_value(self, v):
@@ -66,24 +71,28 @@ class SearchTree():
     
     def final_action(self):
         denom = 0
-        rectified_visits = np.zeros(len(self.root.actions))
-        for action in self.root.actions:
-            child = self.root.children[action]
-            x = child.visits ** (1 / self.tau)
-            rectified_visits[action] = x
-            denom += x
-        
+        rectified_visits = np.zeros(self.columns)
+
+        for action in range(self.columns):
+            if action in self.root.actions:
+                child = self.root.children[action]
+                x = child.visits ** (1 / self.tau)
+                rectified_visits[action] = x
+                denom += x
+            else:
+                rectified_visits[action] = 0
+
         probs = rectified_visits / denom
 
-        # print('Probs: ', probs)
+        probs[probs < self.cutoff] = 0
 
-        index = np.random.choice(len(self.root.actions), p=probs)
+        probs = probs / np.sum(probs)
 
-        action = self.root.actions[index]
+        action = np.random.choice(self.columns, p=probs)
 
         self.shift_root(action)
 
-        return action, probs[index], self.root.terminal
+        return action, probs, self.root.terminal, self.root.win
 
     def choose_action(self, v):
         Q_a = np.array([v.children[action].q for action in v.children], dtype=np.float32)
@@ -92,7 +101,7 @@ class SearchTree():
         total_visits = np.sum(visits)
         U_a = self.c * probs * np.sqrt(total_visits)/ (1 + visits)
         index = np.argmax(Q_a + U_a)
-        return v.children[index]
+        return list(v.children.values())[index]
 
     def shift_root(self, action):
         move(self.state, action, 1)
@@ -123,6 +132,12 @@ class SearchTree():
             delta = -1 * delta
             v = v.parent
     
+    def reset(self):
+        self.trim(self.root)
+        self.state = np.zeros((self.rows, self.columns)) 
+        self.root = Node(self.state)
+
+    
     def __str__(self):
         print('\nNew State')
         render(self.state, [1, -1, 0])
@@ -136,21 +151,23 @@ class SearchTree():
             print('Visits: ', child.visits)
             print('Average Reward: ', child.q)
             print('Initial Probability ', child.prob)
+            print('Terminal ', child.terminal)
             print('_' * 20, '\n')
         return ''
-
-
-
 
 class Node():
     def __init__(self, state, prob=None, action=None, parent=None):
         self.reward = 0
-        _, self.terminal = is_terminal(state, action)
         self.visits = 0
         self.q = 0
         self.prob = prob
-
         self.action = action
+        win, self.terminal = is_terminal(state, action)
+
+        if win != 0:
+            self.win = True
+        else:
+            self.win = False
 
         if self.terminal:
             self.actions = []
