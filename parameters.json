@@ -1,5 +1,5 @@
 { 
-    "episodes": 750,
+    "episodes": 500,
     "tau": 1.5,
     "alpha": 0.00001,
     "c_puct": 1,

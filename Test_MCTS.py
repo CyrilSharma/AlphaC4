@@ -15,7 +15,7 @@ params = {
     "gamma": 0.90,
     "alpha": 0.00001,
     "eps": 0.00000000000001,
-    "c_puct": 1,
+    "c_puct": 3,
     "cutoff": 0.05
 }
 
@@ -27,7 +27,7 @@ config = {
     "debug": True
 }
 
-model = keras.models.load_model("my_model", compile=False)
+model = ActorCritic()
 class Test_MCTS(unittest.TestCase):
 
     def test_node(self):
@@ -175,10 +175,6 @@ class Test_MCTS(unittest.TestCase):
 
         # Note that it's always assumed to be player one's turn
         action, probs, terminal, win = tree.MCTS()
-
-        print('Probs: ', probs)
-
-        print('Algorithmn chose: ', action)
 
         print(tree)
         print('_' * 30)

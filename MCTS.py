@@ -10,7 +10,7 @@ class SearchTree():
         if state is None:
             self.state = np.zeros((config['rows'], config['columns'])) 
         else:
-            self.state = state
+            self.state = np.copy(state)
         self.model = model
         self.columns = config['columns']
         self.rows = config['rows']
@@ -20,11 +20,25 @@ class SearchTree():
         self.c = params['c_puct']
         self.steptime = config['timeout'] - 0.5
         self.cutoff = params['cutoff']
+    
+    def set_state(self, state):
+        self.trim(self.root)
+        self.state = np.copy(state)
+        self.root = Node(np.copy(state))
+    
+    @tf.function
+    def call_model(self, state: tf.Tensor):
+        action_vals, state_val = self.model(state, training=False)
+        return action_vals, state_val
 
-    def model_call(self, state):
-        action_vals, state_val = self.model(tf.convert_to_tensor(state.reshape(self.model_dims), dtype=tf.float32))
+    def get_estimates(self, state):
+        input_data = tf.convert_to_tensor(state.reshape(self.model_dims), dtype=tf.float32)
+        action_vals, state_val = self.call_model(input_data)
         legal_action_vals = action_vals.numpy()[0][legal(state)]
-        probs = special.softmax(legal_action_vals)
+        try:
+            probs = special.softmax(legal_action_vals)
+        except ValueError:
+            print('hehe got eem')
         return probs, state_val[0].numpy().item()
     
     def MCTS(self):
@@ -43,14 +57,14 @@ class SearchTree():
         if v.terminal == True:
             delta = 1
         else:
-            _, delta = self.model_call(self.state * -1)
+            _, delta = self.get_estimates(self.state * -1)
         
         unmove(self.state, v.action)
 
         return delta
     
     def expand(self, node):
-        probs, _ = self.model_call(self.state)
+        probs, _ = self.get_estimates(self.state)
 
         i = 0
         for action in node.actions:
@@ -67,6 +81,7 @@ class SearchTree():
                 return self.expand(node)
             else:
                 node = self.choose_action(node)
+
         return node
     
     def final_action(self):
@@ -74,7 +89,7 @@ class SearchTree():
         rectified_visits = np.zeros(self.columns)
 
         for action in range(self.columns):
-            if action in self.root.actions:
+            if action in self.root.children:
                 child = self.root.children[action]
                 x = child.visits ** (1 / self.tau)
                 rectified_visits[action] = x
@@ -84,11 +99,9 @@ class SearchTree():
 
         probs = rectified_visits / denom
 
-        probs[probs < self.cutoff] = 0
-
-        probs = probs / np.sum(probs)
-
         action = np.random.choice(self.columns, p=probs)
+
+        probs[probs == 0] = 0.01
 
         self.shift_root(action)
 
@@ -101,6 +114,7 @@ class SearchTree():
         total_visits = np.sum(visits)
         U_a = self.c * probs * np.sqrt(total_visits)/ (1 + visits)
         index = np.argmax(Q_a + U_a)
+
         return list(v.children.values())[index]
 
     def shift_root(self, action):
@@ -131,7 +145,7 @@ class SearchTree():
             v.reward += delta
             delta = -1 * delta
             v = v.parent
-    
+
     def reset(self):
         self.trim(self.root)
         self.state = np.zeros((self.rows, self.columns)) 

@@ -1,5 +1,6 @@
 import json
 from typing import Any, List, Sequence, Tuple
+import copy
 
 import numpy as np
 import tensorflow as tf
@@ -10,7 +11,7 @@ from tensorflow.keras import layers
 from tf_agents.environments.random_py_environment import RewardFn
 
 from ActorCritic import ActorCritic
-from C4_Helpers import convert_state, render
+from C4_Helpers import convert_state, render, legal
 from MCTS import SearchTree
 from Training import C4Trainer
 
@@ -29,30 +30,40 @@ class Test_Overfitting(C4Trainer):
         state = self.states[index]
         reward = self.rewards[index]
 
-        action_probs = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True)
+        render(state, [1, -1, 0])
+        self.tree.set_state(state)
+
+        initial_prob_list = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True)
+        final_log_prob_list = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True)
         values = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True)
-        rewards = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True)
 
         tau = self.params["tau"]
 
-        action_vals, state_val = self.model(state)
-
-        action, prob = self.get_action(state, action_vals, tau)
-
+        # maximum number of steps
         for t in tf.range(1):
+            action_values, state_val = self.call_model(tf.convert_to_tensor(state.reshape(1, self.rows, self.columns, 1), dtype=tf.float32))
 
-            rewards = rewards.write(t, reward)
+            init_probs = self.get_probs(action_values)
+        
+            action, probs, terminal, win = self.tree.MCTS()
 
+            final_log_probs = self.get_log_probs(probs)
+
+            # store value, and removes size 1 dimensions
             values = values.write(t, tf.squeeze(state_val))
+            
+            # store inital probability distribution
+            initial_prob_list = initial_prob_list.write(t, init_probs)
 
-            action_probs = action_probs.write(t, prob)
+            # store improved probability distribution
+            final_log_prob_list = final_log_prob_list.write(t, final_log_probs)
 
         # convert tensor array to tensor
-        action_probs = action_probs.stack()
+        initial_prob_list = initial_prob_list.stack()
+        final_log_prob_list = final_log_prob_list.stack()
         values = values.stack()
-        rewards = rewards.stack()
 
-        return action_probs, values, rewards
+        return initial_prob_list, final_log_prob_list, values, reward
     
     """ def compute_loss(self, action_probs: tf.Tensor,  values: tf.Tensor,  returns: tf.Tensor, loss_function: tf.keras.losses.Loss) -> tf.Tensor:
         Computes the combined actor-critic loss.

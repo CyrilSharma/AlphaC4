@@ -1,3 +1,4 @@
+import json
 from typing import Any, List, Sequence, Tuple
 
 import numpy as np
@@ -8,15 +9,23 @@ from tensorflow import keras
 from tensorflow.keras import layers
 
 from ActorCritic import ActorCritic
-from Training import get_action, tf_env_reset
+from C4_Helpers import state_to_action
+from MCTS import SearchTree
+
+# Opening JSON file 
+with open('parameters.json') as f:
+    params = json.load(f) 
+
+with open('C4_Config.json') as f:
+    config = json.load(f) 
 
 model = keras.models.load_model("my_model", compile=False)
+tree = SearchTree(model, params, config)
 env = make("connectx", debug=True)
 env.render()
 
 
 def battle(mode):
-
     running_reward = 0
 
     with tqdm.trange(500) as t:
@@ -29,22 +38,14 @@ def battle(mode):
                 player = 1
 
             trainer = env.train(config)
-            state = tf_env_reset()
 
             while not env.done:
 
-                action_values, state_val = model(state)
-
-                print(state_val.numpy())
-
-                tau = 0.5
-                
-                action, prob = get_action(state, action_values, tau)
-
-                action = int(action.numpy())
+                action, _, _, _ = tree.MCTS()
 
                 observation, reward, done, _ = trainer.step(action)
-                state = tf.convert_to_tensor(np.array(observation['board'], dtype=np.float32).reshape(1, 6, 7, 1))
+
+                state_to_action(tree.state * -1, np.array(observation).reshape(6, 7))
 
             running_reward = reward * 0.01 + running_reward * 0.99
 

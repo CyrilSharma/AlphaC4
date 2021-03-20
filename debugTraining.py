@@ -18,22 +18,44 @@ class debugTraining(unittest.TestCase):
 
     def test_Overfitting(self):
         params = {
-            "episodes": 1500,
-            "tau": 4.0,
-            "gamma": 0.90,
+            "episodes": 100,
+            "tau": 1.5,
             "alpha": 0.00001,
             "eps": 0.00000000000001,
-            "c_puct": 1
+            "c_puct": 1,
+            "c": 0.001,
+            "cutoff": 0.05
         }
 
-        with open('C4_Config.json') as f:
-            config = json.load(f) 
+        config = {
+            "rows": 6, 
+            "columns": 7, 
+            "inarow": 4,
+            "timeout": 2,
+            "debug": True
+        }
 
-        state1 = tf.convert_to_tensor(np.array([[0, 0, 0, 0, 0, 0, 0], [0, 1, 0, 0, 0, 1, 0], [0, -1, 0, 0, 0, -1, 0],
-        [0, 1, 0, 0, 1, 0, 0], [0, -1, 0, 1, -1, 0, 0], [0, 1, -1, 1, -1, 0, 0]]).reshape(1, rows, columns, 1), dtype=tf.float32)
+        state1 = np.array(
+            [
+                [0, 0, 0, 0, 0, 0, 0], 
+                [0, 1, 0, 0, 0, 0, 0], 
+                [0, -1, 0, 0, 0, 0, 0],
+                [0, 1, 0, 0, 1, 0, 0], 
+                [0, -1, 0, 1, -1, 0, 0], 
+                [0, 1, -1, 1, -1, 0, 0]
+            ]
+        )
 
-        state2 = tf.convert_to_tensor(np.array([[0, 0, 0, 0, 0, 0, 0], [0, 1, 0, 0, 0, -1, 0], [0, -1, 0, 0, 0, -1, 0],
-        [0, 1, 0, 0, 1, 0, 0], [0, -1, 0, 1, -1, 0, 0], [0, 1, -1, 1, -1, 0, 0]]).reshape(1, rows, columns, 1), dtype=tf.float32)
+        state2 = np.array(
+            [
+                [0, 0, 0, 0, 0, 0, 0], 
+                [0, 1, 0, 0, 0, 0, 0], 
+                [0, -1, 0, 1, 0, 0, 0],
+                [0, 1, 0, -1, 1, 0, 0], 
+                [0, -1, 1, 1, -1, 0, 0], 
+                [0, 1, -1, 1, -1, 0, 0]
+            ]
+        )
 
         states = [state1, state2]
 
@@ -41,21 +63,21 @@ class debugTraining(unittest.TestCase):
 
         overfit_trainer = Test_Overfitting(params, config, states, rewards)
 
-        action_vals, state_val = overfit_trainer.model(state1)
+        action_vals, state_val = overfit_trainer.call_model(tf.convert_to_tensor(state1.reshape(1, rows, columns, 1), dtype=tf.float32))
         print('Model predicted: ', state_val.numpy().item())
         print('Answer', rewards[0])
 
-        action_vals, state_val = overfit_trainer.model(state2)
+        action_vals, state_val = overfit_trainer.call_model(tf.convert_to_tensor(state2.reshape(1, rows, columns, 1), dtype=tf.float32))
         print('Model predicted: ', state_val.numpy().item())
         print('Answer', rewards[1])
 
         overfit_trainer.training_loop()
 
-        action_vals, state_val = overfit_trainer.model(state1)
+        action_vals, state_val = overfit_trainer.call_model(tf.convert_to_tensor(state1.reshape(1, rows, columns, 1), dtype=tf.float32))
         print('Model predicted: ', state_val.numpy().item())
         print('Answer', rewards[0])
 
-        action_vals, state_val = overfit_trainer.model(state2)
+        action_vals, state_val = overfit_trainer.call_model(tf.convert_to_tensor(state2.reshape(1, rows, columns, 1), dtype=tf.float32))
         print('Model predicted: ', state_val.numpy().item())
         print('Answer', rewards[1])
 

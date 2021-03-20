@@ -29,6 +29,7 @@ def count(state, column, row, mark, offset_row, offset_column):
 
 
 def is_win(state: np.ndarray, action: int):
+    """ Determines if the last action taken was a winnning move """
     column = state[:, action]
     zeros = np.count_nonzero(column == 0)
     row = zeros
@@ -42,6 +43,7 @@ def is_win(state: np.ndarray, action: int):
     )
 
 def is_terminal(state: np.ndarray, action: int) -> [float, bool]:
+    """ Assesses whether a state is terminal and also returns whether or not it was a win """
 
     terminal = False
 
@@ -65,18 +67,21 @@ def is_terminal(state: np.ndarray, action: int) -> [float, bool]:
     return reward, terminal
 
 def unmove(state: np.ndarray, action: int):
+    """ Removes a move in the desired column by modifying the original state """
     column = state[:, action]
     zeros = np.count_nonzero(column == 0)
     row = zeros
     state[row, action] = 0
 
 def move(state: np.ndarray, action: int, mark: int):
+    """ Makes a move in the desired column by modifying the original state """
     column = state[:, action]
     zeros = np.count_nonzero(column == 0)
     row = zeros - 1
     state[row, action] = mark
 
 def legal(state: np.ndarray):
+    """ Determines the legal actions in a state """
     legal_actions = []
     row = state[0, :]
 
@@ -91,7 +96,22 @@ def convert_state(state: np.ndarray):
     state_opp[state_opp == 2] = -1
     return state_opp
 
+def state_to_action(state_old: np.ndarray, state_new: np.ndarray):
+    """ Takes in a new state and outputs the action that was taken) """
+    for action in range(ROW_LENGTH):
+        column1 = state_old[:, action]
+        column2 = state_new[:, action]
+        diff = np.count_nonzero(column2) - np.count_nonzero(column1)
+
+        if diff == 1:
+            return action
+    
+    return None
+
 def render(state, token_nums=[1, 2, 0]):
+    """ Renders a state
+        token_nums = [Player 1 token, Player 2 token, empty token]
+    """
     print()
 
     p1, p2, space = token_nums
