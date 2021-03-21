@@ -4,6 +4,7 @@ import tensorflow as tf
 import time
 import copy
 from C4_Helpers import convert_state, is_terminal, legal, move, unmove, render
+from Exceptions import InvalidActionError
 
 class SearchTree():
     def __init__(self, model, params, config, state=None):
@@ -16,6 +17,7 @@ class SearchTree():
         self.rows = config['rows']
         self.model_dims = (1, config['rows'], config['columns'], 1)
         self.root = Node(self.state)
+        self.parent = None
         self.tau = params['tau']
         self.c = params['c_puct']
         self.steptime = config['timeout'] - 0.5
@@ -26,6 +28,16 @@ class SearchTree():
         self.state = np.copy(state)
         self.root = Node(np.copy(state))
     
+    def move(self, action):
+        if action is not None:
+            move(self.state, action, 1)
+            self.state *= -1
+
+    def unmove(self, action):
+        if action is not None:
+            self.state *= -1
+            unmove(self.state, action)
+
     @tf.function
     def call_model(self, state: tf.Tensor):
         action_vals, state_val = self.model(state, training=False)
@@ -35,14 +47,13 @@ class SearchTree():
         input_data = tf.convert_to_tensor(state.reshape(self.model_dims), dtype=tf.float32)
         action_vals, state_val = self.call_model(input_data)
         legal_action_vals = action_vals.numpy()[0][legal(state)]
-        try:
-            probs = special.softmax(legal_action_vals)
-        except ValueError:
-            print('hehe got eem')
+        probs = special.softmax(legal_action_vals)
+
         return probs, state_val[0].numpy().item()
     
     def MCTS(self):
         if not self.root.terminal:
+            t_0 = time.time()
             t_end = time.time() + self.steptime
             self.expand(self.root)
             while (time.time() < t_end):
@@ -50,16 +61,14 @@ class SearchTree():
                 delta = self.estimate_value(v)
                 self.backup(v, delta)
             return self.final_action()
+        else:
+            raise InvalidActionError(message='Action was taken after the game ended')
     
     def estimate_value(self, v):
-        move(self.state, v.action, 1)
-
         if v.terminal == True:
             delta = 1
         else:
-            _, delta = self.get_estimates(self.state * -1)
-        
-        unmove(self.state, v.action)
+            _, delta = self.get_estimates(self.state)
 
         return delta
     
@@ -68,11 +77,11 @@ class SearchTree():
 
         i = 0
         for action in node.actions:
-            move(self.state, action, 1)
-            node.append_child(self.state * -1, probs[i], action)
-            unmove(self.state, action)
+            self.move(action)
+            node.append_child(self.state, probs[i], action)
+            self.unmove(action)
             i += 1
-
+        
         return node
     
     def tree_policy(self, node):
@@ -81,6 +90,8 @@ class SearchTree():
                 return self.expand(node)
             else:
                 node = self.choose_action(node)
+            
+            self.move(node.action)
 
         return node
     
@@ -96,12 +107,10 @@ class SearchTree():
                 denom += x
             else:
                 rectified_visits[action] = 0
-
+        
         probs = rectified_visits / denom
 
         action = np.random.choice(self.columns, p=probs)
-
-        probs[probs == 0] = 0.01
 
         self.shift_root(action)
 
@@ -118,16 +127,19 @@ class SearchTree():
         return list(v.children.values())[index]
 
     def shift_root(self, action):
-        move(self.state, action, 1)
-        self.state *= -1
+        self.move(action)
         
         actions = copy.deepcopy(self.root.actions)
         actions.remove(action)
 
         for a in actions:
             self.trim(self.root.get_child(a))
+        
+        self.parent = copy.deepcopy(self.root)
 
         self.root = self.root.get_child(action)
+        self.root.parent = None
+        self.root.action = None
 
     def trim(self, node):
         for action in node.children:
@@ -140,6 +152,7 @@ class SearchTree():
             
     def backup(self, v, delta):
         while v is not None:
+            self.unmove(v.action)
             v.q += (delta - v.q) / (v.visits + 1)
             v.visits += 1
             v.reward += delta
@@ -157,10 +170,10 @@ class SearchTree():
         render(self.state, [1, -1, 0])
         print('Actions')
         print('_' * 30)
-        for action in self.root.parent.actions:
+        for action in self.parent.actions:
             print('\nAction ', action)
             print('_' * 20)
-            child = self.root.parent.get_child(action)
+            child = self.parent.get_child(action)
             print('\nReward: ', child.reward)
             print('Visits: ', child.visits)
             print('Average Reward: ', child.q)

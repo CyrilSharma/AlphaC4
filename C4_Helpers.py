@@ -68,10 +68,13 @@ def is_terminal(state: np.ndarray, action: int) -> [float, bool]:
 
 def unmove(state: np.ndarray, action: int):
     """ Removes a move in the desired column by modifying the original state """
-    column = state[:, action]
-    zeros = np.count_nonzero(column == 0)
-    row = zeros
-    state[row, action] = 0
+    try:
+        column = state[:, action]
+        zeros = np.count_nonzero(column == 0)
+        row = zeros
+        state[row, action] = 0
+    except IndexError:
+        print('Hehe Got em')
 
 def move(state: np.ndarray, action: int, mark: int):
     """ Makes a move in the desired column by modifying the original state """
@@ -99,16 +102,16 @@ def convert_state(state: np.ndarray):
 def state_to_action(state_old: np.ndarray, state_new: np.ndarray):
     """ Takes in a new state and outputs the action that was taken) """
     for action in range(ROW_LENGTH):
-        column1 = state_old[:, action]
-        column2 = state_new[:, action]
-        diff = np.count_nonzero(column2) - np.count_nonzero(column1)
+        column_old = state_old[:, action]
+        column_new = state_new[:, action]
+        diff = np.count_nonzero(column_new) - np.count_nonzero(column_old)
 
         if diff == 1:
             return action
     
     return None
 
-def render(state, token_nums=[1, 2, 0]):
+def render(state, token_nums=[1, -1, 0]):
     """ Renders a state
         token_nums = [Player 1 token, Player 2 token, empty token]
     """

@@ -22,7 +22,7 @@ def main():
         config = json.load(f) 
 
     trainer = C4Trainer(params, config)
-    trainer.training_loop()
+    trainer.training_loop(display=True)
 
 class C4Trainer():
     def __init__(self, params, config, input_shape=(1,6,7,1)):
@@ -58,16 +58,17 @@ class C4Trainer():
     
     def get_log_probs(self, probs):
         idx = legal(self.tree.state)
-        legal_log_probs = np.log(probs)
 
-        # should probably be its own method for unit testing purposes
-        # set log_probs of invalid actions to zero
         log_probs = []
-        for a in range(self.columns):
-            if a in idx:
-                log_probs.append(legal_log_probs[a])
+
+        i = 0
+        for prob in probs:
+            if i in idx:
+                log_probs.append(np.log(prob))
             else:
-                log_probs.append(0)
+                log_probs.append(0.0)
+            
+            i += 1
         
         return tf.convert_to_tensor(log_probs, dtype=tf.float32)
 
@@ -78,7 +79,6 @@ class C4Trainer():
         values = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True)
 
         max_steps = self.rows * self.columns
-        tau = self.params["tau"]
 
         terminals = []
 
@@ -97,7 +97,6 @@ class C4Trainer():
                 final_log_probs = self.get_log_probs(probs)
 
                 if player == i:
-
                     # store value, and removes size 1 dimensions
                     values = values.write(t, tf.squeeze(state_val))
                     
@@ -170,7 +169,7 @@ class C4Trainer():
 
         return reward.numpy(), loss.numpy()
 
-    def training_loop(self, display=True, save=True):
+    def training_loop(self, display=True, save=True, graphs=True):
         # np.random.seed(42)
 
         episodes = self.params["episodes"]
@@ -200,13 +199,16 @@ class C4Trainer():
                 # Show average episode reward every 10 episodes
                 if (i % 5 == 0 and display):
                     print(f'Episode {i}: average loss: {running_loss}')
+                    # print(self.tree)
                     render(self.tree.state * -1, [1, -1, 0])
+
         
-        plt.title("Loss over time") 
-        plt.xlabel("Episode") 
-        plt.ylabel("Loss") 
-        plt.plot(episode_nums,losses) 
-        plt.show()
+        if graphs:
+            plt.title("Loss over time") 
+            plt.xlabel("Episode") 
+            plt.ylabel("Loss") 
+            plt.plot(episode_nums,losses) 
+            plt.show()
                     
         if save:
             self.model.save("my_model", save_format='tf')

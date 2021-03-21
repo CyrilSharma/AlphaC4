@@ -9,7 +9,7 @@ from tensorflow import keras
 from tensorflow.keras import layers
 
 from ActorCritic import ActorCritic
-from C4_Helpers import state_to_action
+from C4_Helpers import state_to_action, convert_state, render
 from MCTS import SearchTree
 
 # Opening JSON file 
@@ -18,6 +18,8 @@ with open('parameters.json') as f:
 
 with open('C4_Config.json') as f:
     config = json.load(f) 
+
+# config["timeout"] = 200
 
 model = keras.models.load_model("my_model", compile=False)
 tree = SearchTree(model, params, config)
@@ -28,7 +30,7 @@ env.render()
 def battle(mode):
     running_reward = 0
 
-    with tqdm.trange(500) as t:
+    with tqdm.trange(100) as t:
         for i in t:
             if np.random.randint(2) == 0:
                 config = [mode, None]
@@ -39,13 +41,34 @@ def battle(mode):
 
             trainer = env.train(config)
 
+            observation = trainer.reset()
+
+            state_new = convert_state(np.array(observation['board']).reshape(6, 7))
+
+            tree.set_state(state_new * -1)
+
             while not env.done:
 
                 action, _, _, _ = tree.MCTS()
 
+                print('Action!: ', action)
+
+                render(tree.state * -1, [1, -1, 0])
+
                 observation, reward, done, _ = trainer.step(action)
 
-                state_to_action(tree.state * -1, np.array(observation).reshape(6, 7))
+                if done:
+                    break
+
+                state_new = convert_state(np.array(observation['board']).reshape(6, 7))
+
+                action = state_to_action(tree.state * -1, state_new)
+
+                print('Action!: ', action)
+
+                render(state_new, [1, -1, 0])
+
+                tree.shift_root(action)
 
             running_reward = reward * 0.01 + running_reward * 0.99
 

@@ -32,8 +32,8 @@ class Test_MCTS(unittest.TestCase):
 
     def test_node(self):
         print('Original state: ')
-        state = np.array([[0, 2, 0, 0, 0, 1, 0], [0, 1, 0, 0, 0, 2, 0], [0, 2, 0, 0, 0, 2, 0],
-        [0, 1, 0, 0, 1, 2, 0], [0, 1, 0, 1, 2, 1, 0], [0, 1, 2, 1, 2, 1, 0]])
+        state = convert_state(np.array([[0, 2, 0, 0, 0, 1, 0], [0, 1, 0, 0, 0, 2, 0], [0, 2, 0, 0, 0, 2, 0],
+        [0, 1, 0, 0, 1, 2, 0], [0, 1, 0, 1, 2, 1, 0], [0, 1, 2, 1, 2, 1, 0]]))
         render(state)
 
         node = Node(state=state, action=1)
@@ -42,8 +42,8 @@ class Test_MCTS(unittest.TestCase):
 
         move(state, child.action, 1)
 
-        answer = np.array([[0, 2, 0, 0, 0, 1, 0], [0, 1, 0, 0, 0, 2, 0], [0, 2, 0, 0, 0, 2, 0],
-        [0, 1, 0, 0, 1, 2, 0], [0, 1, 1, 1, 2, 1, 0], [0, 1, 2, 1, 2, 1, 0]])
+        answer = convert_state(np.array([[0, 2, 0, 0, 0, 1, 0], [0, 1, 0, 0, 0, 2, 0], [0, 2, 0, 0, 0, 2, 0],
+        [0, 1, 0, 0, 1, 2, 0], [0, 1, 1, 1, 2, 1, 0], [0, 1, 2, 1, 2, 1, 0]]))
 
         print('Method returns: ')
         render(state)
@@ -56,8 +56,8 @@ class Test_MCTS(unittest.TestCase):
         np.random.seed(42)
 
         print('Original state: ')
-        state = np.array([[0, 2, 0, 0, 0, 1, 0], [0, 1, 0, 0, 0, 2, 0], [0, 2, 0, 0, 0, 2, 0],
-        [0, 1, 0, 0, 1, 2, 0], [0, 1, 0, 1, 2, 1, 0], [0, 1, 2, 1, 2, 1, 0]])
+        state = convert_state(np.array([[0, 2, 0, 0, 0, 1, 0], [0, 1, 0, 0, 0, 2, 0], [0, 2, 0, 0, 0, 2, 0],
+        [0, 1, 0, 0, 1, 2, 0], [0, 1, 0, 1, 2, 1, 0], [0, 1, 2, 1, 2, 1, 0]]))
         render(state)
 
         tree = SearchTree(state=state, model=model, params=params, config=config)
@@ -71,8 +71,8 @@ class Test_MCTS(unittest.TestCase):
     
 
     def test_MCTS_backup(self):
-        state = np.array([[0, 2, 0, 0, 0, 1, 0], [0, 1, 0, 0, 0, 2, 0], [0, 2, 0, 0, 0, 2, 0],
-        [0, 1, 0, 0, 1, 2, 0], [0, 1, 0, 1, 2, 1, 0], [0, 1, 2, 1, 2, 1, 0]])
+        state = convert_state(np.array([[0, 2, 0, 0, 0, 1, 0], [0, 1, 0, 0, 0, 2, 0], [0, 2, 0, 0, 0, 2, 0],
+        [0, 1, 0, 0, 1, 2, 0], [0, 1, 0, 1, 2, 1, 0], [0, 1, 2, 1, 2, 1, 0]]))
 
         tree = SearchTree(state=state, model=model, params=params, config=config)
 
@@ -118,7 +118,7 @@ class Test_MCTS(unittest.TestCase):
         print(tree)
     
     def test2_MCTS(self):
-        print('\nTest2')
+        print('\nTest 2')
         print('_' * 30, '\n')
         np.random.seed(42)
 
@@ -147,7 +147,7 @@ class Test_MCTS(unittest.TestCase):
         self.assertTrue(action == 3)
     
     def test3_MCTS(self):
-        print('\nTest2')
+        print('\nTest 3')
         print('_' * 30, '\n')
         np.random.seed(42)
 
@@ -178,9 +178,86 @@ class Test_MCTS(unittest.TestCase):
 
         print(tree)
         print('_' * 30)
+
         self.assertTrue(action == 3)
     
-            
+    def test4_MCTS(self):
+        print('\nTest 4')
+        print('_' * 30, '\n')
+        np.random.seed(42)
+
+        config = {
+            "rows": 6, 
+            "columns": 7, 
+            "inarow": 4,
+            "timeout": 2,
+            "debug": True
+        }
+
+        state = np.array(
+        [[-0., -0., -0., -0., -0., -0., -0.],
+        [-0., -0., -0., -0., -0., -0., -0.],
+        [ 0., -0., -0., -0.,  0., -0., -0.],
+        [-0., -0., -0., -0.,  0.,  0., -0.],
+        [-0., -0., -0., 0, -0., -0., -0.],
+        [ 0.,  0.,  0., -0.,  0., -0., -0.]]
+        )
+
+        print('Initial State: ')
+        render(state, [1, -1, 0])
+
+        tree = SearchTree(state=state, model=model, params=params, config=config)
+
+        # Note that it's always assumed to be player one's turn
+        action, probs, terminal, win = tree.MCTS()
+
+        if action is None:
+            failed = True
+        else:
+            failed = False
+
+        print(tree)
+        print('_' * 30)
+
+        self.assertFalse(failed)
+    
+    def test5_MCTS(self):
+        print('\nTest 5')
+        print('_' * 30, '\n')
+        np.random.seed(42)
+
+        config = {
+            "rows": 6, 
+            "columns": 7, 
+            "inarow": 4,
+            "timeout": 2,
+            "debug": True
+        }
+
+        state = np.array(
+        [[-0., -0., -0., -0., -0., -0., -0.],
+        [-0., -0., -0., -0., -0., -0., -0.],
+        [ 0., -0., -0., -0.,  0., -0., -0.],
+        [-0., -0., -0., -0.,  0.,  1., -0.],
+        [-0., -0., -0., 0, -0., 1., -0.],
+        [ 0.,  1.,  0., -1.,  -1., -1., 0.]]
+        )
+
+        print('Initial State: ')
+        render(state, [1, -1, 0])
+
+        tree = SearchTree(state=state, model=model, params=params, config=config)
+
+        # Note that it's always assumed to be player one's turn
+        action, probs, terminal, win = tree.MCTS()
+
+        # Note that it's always assumed to be player one's turn
+        action, probs, terminal, win = tree.MCTS()
+
+        print(tree)
+        print('_' * 30)
+        self.assertTrue(terminal)
+
 
 if __name__ == '__main__':
     unittest.main()

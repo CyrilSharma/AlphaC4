@@ -28,7 +28,7 @@ class Test_Overfitting(C4Trainer):
     def run_episode(self, player=0):
         index = np.random.randint(len(self.states))
         state = self.states[index]
-        reward = self.rewards[index]
+        reward = tf.constant(self.rewards[index], dtype=tf.float32)
 
         render(state, [1, -1, 0])
         self.tree.set_state(state)
@@ -42,6 +42,9 @@ class Test_Overfitting(C4Trainer):
         # maximum number of steps
         for t in tf.range(1):
             action_values, state_val = self.call_model(tf.convert_to_tensor(state.reshape(1, self.rows, self.columns, 1), dtype=tf.float32))
+
+            print('Action_values: ', action_values)
+            print('State_val: ', state_val)
 
             init_probs = self.get_probs(action_values)
         
