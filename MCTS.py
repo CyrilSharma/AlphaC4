@@ -4,6 +4,7 @@ import tensorflow as tf
 import time
 import copy
 from C4_Helpers import convert_state, is_terminal, legal, move, unmove, render
+from threading import Thread
 from Exceptions import InvalidActionError
 
 class SearchTree():
@@ -12,6 +13,7 @@ class SearchTree():
             self.state = np.zeros((config['rows'], config['columns'])) 
         else:
             self.state = np.copy(state)
+
         self.model = model
         self.columns = config['columns']
         self.rows = config['rows']
@@ -22,6 +24,7 @@ class SearchTree():
         self.c = params['c_puct']
         self.steptime = config['timeout'] - 0.5
         self.cutoff = params['cutoff']
+        self.expand(self.root)
     
     def set_state(self, state):
         self.trim(self.root)
@@ -55,7 +58,6 @@ class SearchTree():
         if not self.root.terminal:
             t_0 = time.time()
             t_end = time.time() + self.steptime
-            self.expand(self.root)
             while (time.time() < t_end):
                 v = self.tree_policy(self.root)
                 delta = self.estimate_value(v)
@@ -66,7 +68,10 @@ class SearchTree():
     
     def estimate_value(self, v):
         if v.terminal == True:
-            delta = 1
+            if v.win:
+                delta = 1
+            else:
+                delta = 0
         else:
             _, delta = self.get_estimates(self.state)
 
@@ -96,21 +101,39 @@ class SearchTree():
         return node
     
     def final_action(self):
-        denom = 0
-        rectified_visits = np.zeros(self.columns)
+        if self.tau != 0:
+            denom = 0
+            rectified_visits = np.zeros(self.columns)
 
-        for action in range(self.columns):
-            if action in self.root.children:
-                child = self.root.children[action]
-                x = child.visits ** (1 / self.tau)
-                rectified_visits[action] = x
-                denom += x
-            else:
-                rectified_visits[action] = 0
-        
-        probs = rectified_visits / denom
+            for action in range(self.columns):
+                if action in self.root.children:
+                    child = self.root.children[action]
+                    x = child.visits ** (1 / self.tau)
 
-        action = np.random.choice(self.columns, p=probs)
+                    if x != 0:
+                        rectified_visits[action] = x
+                    else:
+                        rectified_visits[action] = 0.01
+                        x = 0.01
+
+                    denom += x
+                else:
+                    rectified_visits[action] = 0
+            
+            probs = rectified_visits / denom
+
+            action = np.random.choice(self.columns, p=probs)
+
+        else:
+            visits = []
+            for action in range(self.columns):
+                if action in self.root.children:
+                    visits.append(self.root.children[action].visits)
+                else:
+                    visits.append(0)
+            
+            action = np.argmax(visits)
+            probs = None
 
         self.shift_root(action)
 
@@ -131,6 +154,7 @@ class SearchTree():
         
         actions = copy.deepcopy(self.root.actions)
         actions.remove(action)
+
 
         for a in actions:
             self.trim(self.root.get_child(a))
@@ -158,11 +182,15 @@ class SearchTree():
             v.reward += delta
             delta = -1 * delta
             v = v.parent
+    
+    def set_tau(self, tau):
+        self.tau = tau
 
     def reset(self):
         self.trim(self.root)
         self.state = np.zeros((self.rows, self.columns)) 
         self.root = Node(self.state)
+        self.expand(self.root)
 
     
     def __str__(self):
@@ -189,12 +217,7 @@ class Node():
         self.q = 0
         self.prob = prob
         self.action = action
-        win, self.terminal = is_terminal(state, action)
-
-        if win != 0:
-            self.win = True
-        else:
-            self.win = False
+        self.win, self.terminal = is_terminal(state, action)
 
         if self.terminal:
             self.actions = []

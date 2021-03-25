@@ -43,9 +43,6 @@ class Test_Overfitting(C4Trainer):
         for t in tf.range(1):
             action_values, state_val = self.call_model(tf.convert_to_tensor(state.reshape(1, self.rows, self.columns, 1), dtype=tf.float32))
 
-            print('Action_values: ', action_values)
-            print('State_val: ', state_val)
-
             init_probs = self.get_probs(action_values)
         
             action, probs, terminal, win = self.tree.MCTS()

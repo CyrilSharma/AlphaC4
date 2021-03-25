@@ -45,26 +45,23 @@ def is_win(state: np.ndarray, action: int):
 def is_terminal(state: np.ndarray, action: int) -> [float, bool]:
     """ Assesses whether a state is terminal and also returns whether or not it was a win """
 
+    win = False
     terminal = False
 
     if action is None:
-        return 0.0, False
-
-    if is_win(state, action):
+        return False, False
+    elif is_win(state, action):
         terminal = True
-        reward = 1.0
-        return reward, terminal
-    
-    top_row = state[0, :]
+        win = True
+        return win, terminal
 
-    if (np.count_nonzero(top_row) == ROW_LENGTH):
+    # if top row is full
+    elif (np.count_nonzero(state[0, :]) == ROW_LENGTH):
         terminal = True
-        reward = 0.0
     else:
         terminal = False
-        reward = 0.0
 
-    return reward, terminal
+    return win, terminal
 
 def unmove(state: np.ndarray, action: int):
     """ Removes a move in the desired column by modifying the original state """

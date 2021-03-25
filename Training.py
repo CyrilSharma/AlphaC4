@@ -30,6 +30,7 @@ class C4Trainer():
         self.rows = config['rows']
         self.columns = config['columns']
         self.params = params
+        self.config = config
         self.model = ActorCritic()
         self.tree = SearchTree(self.model, params, config)
         self.input_dims = input_shape
@@ -64,7 +65,10 @@ class C4Trainer():
         i = 0
         for prob in probs:
             if i in idx:
-                log_probs.append(np.log(prob))
+                try:
+                    log_probs.append(np.log(prob))
+                except RuntimeWarning:
+                    print('Hehe got em')
             else:
                 log_probs.append(0.0)
             
@@ -168,10 +172,66 @@ class C4Trainer():
         self.optimizer.apply_gradients(zip(grads, self.model.trainable_variables))
 
         return reward.numpy(), loss.numpy()
+    
+    def test_network(self, num, episodes=20):
+
+        model_old = keras.models.load_model(f"Models/v{num}", compile=False)
+
+        old_tree = SearchTree(model_old, self.params, self.config)
+
+        self.tree.reset()
+
+        trees = [self.tree, old_tree]
+
+        avg_reward = 0
+    
+        for ep_num in range(episodes):
+            # reset trees, and make tau non zeroo
+            self.tree.reset()
+            old_tree.reset()
+            self.tree.set_tau(self.params['tau'])
+            old_tree.set_tau(self.params['tau'])
+
+            player = np.random.randint(2)
+
+            if player != 0:
+                action, _, terminal, win = old_tree.MCTS()
+                self.tree.shift_root(action)
+
+            terminal = False
+            i = 0
+            
+            while not terminal:
+                # after a few moves, play greedily
+                if i == self.params['exploratory_turns']:
+                    self.tree.set_tau(0)
+                    old_tree.set_tau(0)
+
+                action, _, terminal, win = trees[i % 2].MCTS()
+
+                if terminal:
+                    break
+
+                trees[(i + 1) % 2].shift_root(action)
+
+                i += 1
+            
+            if win:
+                if (i % 2) == 0:
+                    reward = 1
+                else:
+                    reward = -1
+            else:
+                reward = 0
+
+            render(trees[i%2].state * -1, [1, -1, 0])
+
+            avg_reward += (reward - avg_reward) / (ep_num + 1)
+        
+        self.tree.set_tau(self.params['tau'])
+        print(f'New network scored an average reward of: {avg_reward} against the old network.')
 
     def training_loop(self, display=True, save=True, graphs=True):
-        # np.random.seed(42)
-
         episodes = self.params["episodes"]
 
         running_reward = 0
@@ -179,6 +239,8 @@ class C4Trainer():
 
         episode_nums = list(range(1, episodes + 1))
         losses = [0 for num in range(episodes)]
+
+        version = 1
 
         with tqdm.trange(episodes) as t:
             for i in t:
@@ -195,6 +257,15 @@ class C4Trainer():
 
                 t.set_description(f'Episode {i}')
                 t.set_postfix(episode_loss=loss, running_loss=running_loss)
+
+                if i == self.params["test_every"] - 1:
+                    self.model.save(f"Models/v{version}", save_format='tf')
+                    version += 1
+
+                if (((i + 1) % self.params["test_every"]) == 0 and i > (self.params["test_every"] - 1)):
+                    self.model.save(f"Models/v{version}", save_format='tf')
+                    self.test_network(version - 1)
+                    version += 1
 
                 # Show average episode reward every 10 episodes
                 if (i % 5 == 0 and display):
