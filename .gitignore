@@ -4,3 +4,7 @@ __pycache__/
 .vscode/
 .DS_Store/
 Models/
+vcpkg/
+cmake-build-debug/
+.idea/
+cppflow/

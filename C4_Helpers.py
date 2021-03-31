@@ -42,7 +42,7 @@ def is_win(state: np.ndarray, action: int):
         or (count(state, action, row, mark, -1, 1) + count(state, action, row, mark, 1, -1)) >= (INAROW - 1)  # top right diagonal.
     )
 
-def is_terminal(state: np.ndarray, action: int) -> [float, bool]:
+def is_terminal(state: np.ndarray, action: int) -> [bool, bool]:
     """ Assesses whether a state is terminal and also returns whether or not it was a win """
 
     win = False

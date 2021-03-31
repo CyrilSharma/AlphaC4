@@ -18,12 +18,13 @@ class debugTraining(unittest.TestCase):
 
     def test_Overfitting(self):
         params = {
-            "episodes": 100,
+            "episodes": 50,
             "tau": 1.5,
             "alpha": 0.00001,
             "c_puct": 1,
             "c": 0.001,
-            "cutoff": 0.05
+            "cutoff": 0.05,
+            "test_every": 500
         }
 
         config = {
@@ -70,7 +71,7 @@ class debugTraining(unittest.TestCase):
         print('Model predicted: ', state_val.numpy().item())
         print('Answer', rewards[1])
 
-        overfit_trainer.training_loop(display=False, save=False, graphs=False)
+        overfit_trainer.training_loop(display=False, save=True, graphs=False)
 
         action_vals, state_val = overfit_trainer.call_model(tf.convert_to_tensor(state1.reshape(1, rows, columns, 1), dtype=tf.float32))
         print('Model predicted: ', state_val.numpy().item())

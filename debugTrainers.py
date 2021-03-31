@@ -8,7 +8,6 @@ import tqdm
 from kaggle_environments import evaluate, make, utils
 from tensorflow import keras
 from tensorflow.keras import layers
-from tf_agents.environments.random_py_environment import RewardFn
 
 from ActorCritic import ActorCritic
 from C4_Helpers import convert_state, render, legal
@@ -64,13 +63,5 @@ class Test_Overfitting(C4Trainer):
         values = values.stack()
 
         return initial_prob_list, final_log_prob_list, values, reward
-    
-    """ def compute_loss(self, action_probs: tf.Tensor,  values: tf.Tensor,  returns: tf.Tensor, loss_function: tf.keras.losses.Loss) -> tf.Tensor:
-        Computes the combined actor-critic loss.
-
-        critic_loss = loss_function(values, returns)
-
-        # total loss is actor-critic loss
-        return critic_loss """
 
 

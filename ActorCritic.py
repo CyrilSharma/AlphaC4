@@ -7,7 +7,7 @@ from tensorflow.keras import layers
 
 class ActorCritic(tf.keras.Model):
   """ Combined Actor-Critic network.
-  The idea here is the information the common layers extract can and should be shared with both the actor and the critic"""
+  The idea here is the information the common layers extract can and should be shared with both the actor and the critic """
 
   def __init__(self, filters=32):
     """Initialize."""
