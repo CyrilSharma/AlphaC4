@@ -3,21 +3,25 @@
 //
 
 #include <algorithm>
+#include <iostream>
 #include "C4.h"
+
+using namespace Eigen;
 
 C4::C4(unsigned int r, unsigned int c, unsigned int num):
     state(std::vector<std::vector<int>>(r, std::vector<int>(c, 0))),
     rows(r),
     columns(c),
-    inarow(num){}
+    inarow(num),
+    player(1){}
 
-unsigned int C4::count(int mark, unsigned int column, unsigned int row, int offset_row, int offset_column) {
+unsigned int C4::count(int column, int row, int offset_row, int offset_column) {
     // Counts number of pieces in a certain direction, excluding the starting piece
     for (int i = 0; i < this->inarow; i++) {
         unsigned int r = row + offset_row * i;
         unsigned int c = column + offset_column * i;
         // if current mark doesn't fit into the sequence, stop counting
-        if (r < 0 || c < 0 || c >= this->columns || r >= this->rows || state[r][c] != mark) {
+        if (r < 0 || c < 0 || c >= columns || r >= rows || state[r][c] != player) {
             return i - 1;
         }
     }
@@ -26,20 +30,19 @@ unsigned int C4::count(int mark, unsigned int column, unsigned int row, int offs
 
 bool C4::is_win(unsigned int action) {
     // determine row winning piece was placed in
-    unsigned int row = 0;
-    for (int i = 0; i < this->rows; i++) {
-        if (this->state[i][action] == 0) {
+    int row = 0;
+    for (int i = 0; i < rows; i++) {
+        if (state[i][action] == 0) {
             row += 1;
         }
     }
-    int mark = state[row][action];
 
     // check for connect 4s in all directions
     return (
-            ((count(action, row, mark, 1, 0)) >= this->inarow - 1) ||
-            ((count(action, row, mark, 0, 1) + count(action, row, mark, 0, -1)) >= (this->inarow - 1)) ||
-            ((count(action, row, mark, -1, -1) + count(action, row, mark, 1, 1)) >= (this->inarow - 1)) ||
-            ((count(action, row, mark, -1, 1) + count(action, row, mark, 1, -1)) >= (this->inarow - 1))
+            ((count(action, row, 1, 0)) >= inarow - 1) ||
+            ((count(action, row, 0, 1) + count(action, row, 0, -1)) >= (inarow - 1)) ||
+            ((count(action, row, -1, -1) + count(action, row, 1, 1)) >= (inarow - 1)) ||
+            ((count(action, row, -1, 1) + count(action, row, 1, -1)) >= (inarow - 1))
     );
 }
 
@@ -66,16 +69,30 @@ std::vector<int> C4::is_terminal(unsigned int action) {
 }
 
 void C4::move(unsigned int action) {
-    unsigned int last_row = std::count(this->state[0].begin(), this->state[0].end(), 0);
-    this->state[last_row + 1][action] = 1;
-    flip();
+    int row_num = rows - 1;
+    for (int row = rows - 1; row >= 0; row--) {
+        if (state[row][action] == 0) {
+            break;
+        }
+
+        row_num--;
+    }
+
+    // Make board flipped for ease of use
+    state[row_num][action] = player;
     player *= -1;
 }
 
 void C4::unmove(unsigned int action) {
-    unsigned int last_row = std::count(this->state[0].begin(), this->state[0].end(), 0);
-    this->state[last_row][action] = 0;
-    flip();
+    int row_num = rows;
+    for (unsigned row = rows - 1; row < rows; row--) {
+        if (state[row][action] == 0) {
+            break;
+        }
+
+        row_num--;
+    }
+    state[row_num][action] = 0;
     player *= -1;
 }
 
@@ -93,6 +110,44 @@ std::vector<unsigned int> C4::legal() {
             legal_actions[i] = 1;
         }
         i += 1;
+    }
+    return legal_actions;
+}
+
+void C4::display() const {
+    std::cout << "" << std::endl;
+    for (auto vec: state) {
+        for (int i = 0; i < vec.size(); i++) {
+            if (vec[i] == 1) {
+                std::cout << "+" << vec[i] << " " << std::flush;
+            }
+            else if (vec[i] == 0){
+                std::cout << " " << vec[i] << " " << std::flush;
+            }
+            else{
+                std::cout << vec[i] << " " << std::flush;
+            }
+        }
+        std::cout << "" << std::endl;
+    }
+    std::cout << "" << std::endl;
+}
+
+Eigen::MatrixXd C4::get_eigen_state() {
+    MatrixXd a(rows, columns);
+    for (int i = 0; i < rows; i++) {
+        for (int j = 0; j < columns; j++) {
+            a(i, j) = state[i][j];
+        }
+    }
+    return a;
+}
+
+void C4::set_eigen_state(Eigen::MatrixXd board) {
+    for (int i = 0; i < rows; i++) {
+        for (int j = 0; j < columns; j++) {
+            state[i][j] = static_cast<int>(board(i, j));
+        }
     }
 }
 

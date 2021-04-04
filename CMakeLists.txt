@@ -1,29 +1,29 @@
 cmake_minimum_required(VERSION 3.17)
-project(Connect_4)
+
+project(bindings)
 
 set(CMAKE_CXX_STANDARD 17)
 
-# find_library(TENSORFLOW_LIB tensorflow HINT $ENV{HOME}/libtensorflow2/lib)
+set(SOURCE_DIR "src/utils")
+
 find_library(TENSORFLOW_LIB tensorflow HINT usr/local/lib)
 
-add_executable(Connect_4 main.cpp mcts.h mcts.cpp C4.h C4.cpp NeuralNetwork.cpp NeuralNetwork.h thread_pool.h)
+include_directories(lib/eigen-3.3.9)
 
-add_executable(test_cppflow test_cppflow.cpp)
+include_directories(lib/cppflow/include)
 
-target_include_directories(test_cppflow PRIVATE /usr/local/include)
-target_include_directories(test_cppflow PRIVATE cppflow/include/ usr/local/include)
+include_directories(/usr/local/include)
 
-target_link_libraries (test_cppflow "${TENSORFLOW_LIB}")
-# target_include_directories(test_cppflow PRIVATE cppflow/include/ $ENV{HOME}/libtensorflow2/include)
-target_link_libraries(test_cppflow "${TENSORFLOW_LIB}")
+include_directories(${SOURCE_DIR})
 
-target_include_directories(Connect_4 PRIVATE /usr/local/include)
-target_include_directories(Connect_4 PRIVATE cppflow/include/ usr/local/include)
+link_libraries("${TENSORFLOW_LIB}")
 
-target_link_libraries (Connect_4 "${TENSORFLOW_LIB}")
-# target_include_directories(test_cppflow PRIVATE cppflow/include/ $ENV{HOME}/libtensorflow2/include)
-target_link_libraries(Connect_4 "${TENSORFLOW_LIB}")
+add_subdirectory(lib/pybind11)
 
-find_library(TENSORFLOW_LIB tensorflow HINT $ENV{HOME}/libtensorflow2/lib)
+set(SOURCES "${SOURCE_DIR}/mcts.cpp" "${SOURCE_DIR}/C4.cpp" "${SOURCE_DIR}/NeuralNetwork.cpp")
 
-find_package(TensorflowCC REQUIRED)
+set(TESTS "src/C4_Test.cpp")
+
+pybind11_add_module(bindings ${SOURCES} "${SOURCE_DIR}/bindings.cpp")
+
+add_executable(tests ${TESTS} ${SOURCES})

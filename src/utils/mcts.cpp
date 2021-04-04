@@ -27,7 +27,7 @@ Node::Node()
           action(-1),
           q(0) {}
 
-Node::Node(Node *parent, unsigned int action, double prob, unsigned int num_actions)
+Node::Node(Node *parent, unsigned int action, float prob, unsigned int num_actions)
         : parent(parent),
           children(num_actions, nullptr),
           virtual_loss(0),
@@ -66,8 +66,8 @@ Node &Node::operator=(const Node &node) {
     return *this;
 }
 
-unsigned int Node::best_child(double c_puct, double c_virtual_loss) {
-    double best_value = -DBL_MAX;
+unsigned int Node::best_child(float c_puct, float c_virtual_loss) {
+    float best_value = -DBL_MAX;
     unsigned int best_move = 0;
     Node *best_node;
 
@@ -78,7 +78,7 @@ unsigned int Node::best_child(double c_puct, double c_virtual_loss) {
         }
 
         unsigned int total_child_visits = this->visits.load() + 1;
-        double cur_value =
+        float cur_value =
                 children[i]->PUCT(c_puct, c_virtual_loss, total_child_visits);
         if (cur_value > best_value) {
             best_value = cur_value;
@@ -93,7 +93,7 @@ unsigned int Node::best_child(double c_puct, double c_virtual_loss) {
     return best_move;
 }
 
-void Node::expand(const std::vector<double> &child_probs) {
+void Node::expand(const std::vector<float> &child_probs) {
     {
         // get lock
         std::lock_guard<std::mutex> lock(this->lock);
@@ -113,7 +113,7 @@ void Node::expand(const std::vector<double> &child_probs) {
     }
 }
 
-void Node::backup(double value) {
+void Node::backup(float value) {
     // If it is not root, this node's parent should be updated first
     if (this->parent != nullptr) {
         this->parent->backup(-value);
@@ -133,14 +133,14 @@ void Node::backup(double value) {
     }
 }
 
-double Node::PUCT(double c_puct, double c_virtual_loss,
+float Node::PUCT(float c_puct, float c_virtual_loss,
                            unsigned int total_child_visits) const {
     // u
     auto visits = this->visits.load();
-    double u = (c_puct * this->prob * sqrt(total_child_visits) / (1 + visits));
+    float u = (c_puct * this->prob * sqrt(total_child_visits) / (1 + visits));
 
     // virtual loss
-    double virtual_loss = c_virtual_loss * this->virtual_loss.load();
+    float virtual_loss = c_virtual_loss * this->virtual_loss.load();
     // int visits_with_loss = visits - virtual_loss;
 
     if (visits <= 0) {
@@ -151,12 +151,10 @@ double Node::PUCT(double c_puct, double c_virtual_loss,
     }
 }
 
-// MCTS_Package
-MCTS::MCTS(NeuralNetwork *neural_network, unsigned int thread_num, double c_puct,
-           unsigned int num_mcts_sims, double c_virtual_loss,
-           unsigned int num_actions)
+// utils
+MCTS::MCTS(NeuralNetwork *neural_network, unsigned int num_threads, float c_puct, float c_virtual_loss, unsigned int num_actions)
         : neural_network(neural_network),
-          thread_pool(new ThreadPool(thread_num)),
+          thread_pool(new ThreadPool(num_threads)),
           c_puct(c_puct),
           c_virtual_loss(c_virtual_loss),
           num_actions(num_actions),
@@ -198,7 +196,7 @@ void MCTS::tree_deleter(Node *t) {
     delete t;
 }
 
-std::vector<double> MCTS::final_probs(C4 *c4, double temp) {
+std::vector<float> MCTS::final_probs(C4 *c4, float temp) {
     // submit update tasks to thread_pool
     // std::future is the standard means of accessing the results of asynchronous operations
     std::vector<std::future<void>> futures;
@@ -220,7 +218,7 @@ std::vector<double> MCTS::final_probs(C4 *c4, double temp) {
     }
 
     // calculate probs
-    std::vector<double> action_probs(num_actions, 0);
+    std::vector<float> action_probs(num_actions, 0);
     const auto &children = this->root->children;
 
     // according to the alphazero paper, the temperature was set to an infinitesimal to approximate a greedy policy
@@ -243,7 +241,7 @@ std::vector<double> MCTS::final_probs(C4 *c4, double temp) {
     //
     } else {
         // explore
-        double sum = 0;
+        float sum = 0;
         for (unsigned int i = 0; i < children.size(); i++) {
             if (children[i] && children[i]->visits.load() > 0) {
                 action_probs[i] = pow(children[i]->visits.load(), 1 / temp);
@@ -254,7 +252,7 @@ std::vector<double> MCTS::final_probs(C4 *c4, double temp) {
         // renormalization
         // iterates over each number in action_probs
         std::for_each(action_probs.begin(), action_probs.end(),
-                      [sum](double &x) { x /= sum; });
+                      [sum](float &x) { x /= sum; });
 
         return action_probs;
     }
@@ -263,6 +261,7 @@ std::vector<double> MCTS::final_probs(C4 *c4, double temp) {
 void MCTS::update(std::shared_ptr<C4> game) {
 
     auto node = this->root.get();
+    unsigned int action;
 
     while (true) {
         if (!node->expanded) {
@@ -270,34 +269,32 @@ void MCTS::update(std::shared_ptr<C4> game) {
         }
 
         // select
-        auto action = node->best_child(this->c_puct, this->c_virtual_loss);
-        game->move(action,1);
+        action = node->best_child(this->c_puct, this->c_virtual_loss);
+        game->move(action);
         node = node->children[action];
     }
 
     // get game status
-    auto status = game->is_terminal();
-    double value = 0;
+    auto status = game->is_terminal(action);
+    float value = 0;
 
     // if not terminal
     if (status[0] == 0) {
         // predict action_probs and value by neural network
-        std::vector<double> probs(num_actions, 0);
-
-        //TODO: replace this code with a queue of some sort that queries the network in batches
+        std::vector<float> probs(num_actions, 0);
 
         // Feeds the raw pointer into class neural network
         auto future = this->neural_network->commit(game.get());
         auto result = future.get();
 
-        probs = std::move(result[0]);
+        probs = result[0];
         value = result[1][0];
 
         // mask invalid actions
         auto legal_moves = game->legal();
 
         // sum legal action values
-        double sum = 0;
+        float sum = 0;
         for (unsigned int i = 0; i < num_actions; i++) {
             if (legal_moves[i] == 1) {
                 sum += probs[i];
@@ -309,7 +306,7 @@ void MCTS::update(std::shared_ptr<C4> game) {
         // renormalization
         if (sum > FLT_EPSILON) {
             std::for_each(probs.begin(), probs.end(),
-                          [sum](double &x) { x /= sum; });
+                          [sum](float &x) { x /= sum; });
         } else {
             // all masked
 

@@ -5,15 +5,18 @@
 #ifndef CONNECT_4_C4_H
 #define CONNECT_4_C4_H
 
-#endif //CONNECT_4_C4_H
-
 #include <vector>
+#include <Eigen/Dense>
 
 class C4 {
 public:
-    C4(unsigned int rows, unsigned int columns, unsigned int num);
+    const int rows;
+    const int columns;
+    const int inarow;
 
-    unsigned int count(int mark, unsigned int column, unsigned int row, int offset_row, int offset_column);
+    C4(unsigned int rows, unsigned int columns, unsigned int inarow);
+
+    unsigned int count(int column, int row, int offset_row, int offset_column);
 
     bool is_win(unsigned int action);
 
@@ -29,22 +32,27 @@ public:
 
     std::vector<unsigned int> legal();
 
-    unsigned int inline num_actions() {
-        return columns;
-    }
-
-    std::vector<std::vector<int>> inline get_state() {
+    std::vector<std::vector<int>> inline get_state() const{
         return state;
     }
 
-    int inline get_player() {
+    void set_state(std::vector<std::vector<int>> board) {
+        state = board;
+    }
+
+    void display() const;
+
+    Eigen::MatrixXd get_eigen_state();
+
+    void set_eigen_state(Eigen::MatrixXd board);
+
+    int inline get_player() const{
         return player;
     }
 
 private:
     std::vector<std::vector<int>> state;
-    unsigned int rows;
-    unsigned int columns;
-    unsigned int inarow;
     int player = 1;
 };
+
+#endif //CONNECT_4_C4_H

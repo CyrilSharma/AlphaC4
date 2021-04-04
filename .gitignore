@@ -7,4 +7,6 @@ Models/
 vcpkg/
 cmake-build-debug/
 .idea/
-cppflow/
+lib/
+build/
+src/utils.egg-info
