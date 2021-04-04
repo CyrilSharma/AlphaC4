@@ -151,7 +151,7 @@ double Node::PUCT(double c_puct, double c_virtual_loss,
     }
 }
 
-// MCTS
+// MCTS_Package
 MCTS::MCTS(NeuralNetwork *neural_network, unsigned int thread_num, double c_puct,
            unsigned int num_mcts_sims, double c_virtual_loss,
            unsigned int num_actions)

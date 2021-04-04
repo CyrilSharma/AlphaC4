@@ -14,8 +14,7 @@
 #include <atomic>
 
 #include "C4.h"
-#include <thread_pool.h>
-#include <libtorch.h>
+#include "thread_pool.h"
 #include <mutex>
 
 class Node {
