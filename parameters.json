@@ -1,0 +1,10 @@
+{ 
+    "episodes": 500,
+    "tau": 1.5,
+    "alpha": 0.00001,
+    "c_puct": 1,
+    "c": 0.001,
+    "cutoff": 0.05,
+    "test_every": 25,
+    "exploratory_turns": 6
+}
