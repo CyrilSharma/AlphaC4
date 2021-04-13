@@ -135,7 +135,7 @@ TEST_CASE("Testing the win function") {
         c4->set_state({
                         {0, 0, 0, 0, 0, 0, 0},
                         {0, 0, 0, 0, 0, 0, 0},
-                        {0, 0, 0, 0, 0,1, 0},
+                        {0, 0, 0, 0, 0, 1, 0},
                         {0, 0, 0, 0, 1, -1, 0},
                         {0, 0, 0, 1, -1, -1, 0},
                         {1, 1, 1, -1, -1, -1, 0}
@@ -184,9 +184,9 @@ TEST_CASE("Testing the legal function") {
 
     c4->display();
 
-    std::vector<unsigned int> legal_actions = c4->legal();
+    std::vector<int> legal_actions = c4->legal();
 
-    std::vector<unsigned int> answer = {0, 0, 1, 0, 0, 0, 1};
+    std::vector<int> answer = {0, 0, 1, 0, 0, 0, 1};
 
     CHECK(legal_actions == answer);
 }

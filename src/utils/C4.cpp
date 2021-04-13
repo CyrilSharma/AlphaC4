@@ -8,27 +8,29 @@
 
 using namespace Eigen;
 
-C4::C4(unsigned int r, unsigned int c, unsigned int num):
+C4::C4(int r, int c, int num):
     state(std::vector<std::vector<int>>(r, std::vector<int>(c, 0))),
     rows(r),
     columns(c),
     inarow(num),
     player(1){}
 
-unsigned int C4::count(int column, int row, int offset_row, int offset_column) {
+int C4::count(int column, int row, int offset_row, int offset_column) {
     // Counts number of pieces in a certain direction, excluding the starting piece
+
+    int mark = state[row][column];
     for (int i = 0; i < this->inarow; i++) {
-        unsigned int r = row + offset_row * i;
-        unsigned int c = column + offset_column * i;
+        int r = row + offset_row * i;
+        int c = column + offset_column * i;
         // if current mark doesn't fit into the sequence, stop counting
-        if (r < 0 || c < 0 || c >= columns || r >= rows || state[r][c] != player) {
+        if (r < 0 || c < 0 || c >= columns || r >= rows || state[r][c] != mark) {
             return i - 1;
         }
     }
     return this->inarow;
 }
 
-bool C4::is_win(unsigned int action) {
+bool C4::is_win(int action) {
     // determine row winning piece was placed in
     int row = 0;
     for (int i = 0; i < rows; i++) {
@@ -47,7 +49,7 @@ bool C4::is_win(unsigned int action) {
 }
 
 bool C4::is_draw() {
-    unsigned int zeros = std::count(this->state[0].begin(), this->state[0].end(), 0);
+    int zeros = std::count(this->state[0].begin(), this->state[0].end(), 0);
     if (zeros == 0) {
         return true;
     }
@@ -56,7 +58,7 @@ bool C4::is_draw() {
     }
 }
 
-std::vector<int> C4::is_terminal(unsigned int action) {
+std::vector<int> C4::is_terminal(int action) {
     if (is_win(action)) {
         return {1, 1};
     }
@@ -68,7 +70,7 @@ std::vector<int> C4::is_terminal(unsigned int action) {
     }
 }
 
-void C4::move(unsigned int action) {
+void C4::move(int action) {
     int row_num = rows - 1;
     for (int row = rows - 1; row >= 0; row--) {
         if (state[row][action] == 0) {
@@ -83,9 +85,9 @@ void C4::move(unsigned int action) {
     player *= -1;
 }
 
-void C4::unmove(unsigned int action) {
+void C4::unmove(int action) {
     int row_num = rows;
-    for (unsigned row = rows - 1; row < rows; row--) {
+    for (int row = rows - 1; row < rows; row--) {
         if (state[row][action] == 0) {
             break;
         }
@@ -97,14 +99,15 @@ void C4::unmove(unsigned int action) {
 }
 
 void C4::flip() {
+    std::vector<int> state_copy;
     for (auto v: this->state) {
         transform(v.begin(), v.end(), v.begin(), [](int &c){ return -c; });
     }
 }
 
-std::vector<unsigned int> C4::legal() {
-    std::vector<unsigned int> legal_actions = std::vector<unsigned int>(this->columns, 0);
-    unsigned int i = 0;
+std::vector<int> C4::legal() {
+    std::vector<int> legal_actions = std::vector<int>(this->columns, 0);
+    int i = 0;
     for (auto mark: this->state[0]) {
         if (mark == 0) {
             legal_actions[i] = 1;

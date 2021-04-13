@@ -14,23 +14,23 @@ public:
     const int columns;
     const int inarow;
 
-    C4(unsigned int rows, unsigned int columns, unsigned int inarow);
+    C4(int rows, int columns, int inarow);
 
-    unsigned int count(int column, int row, int offset_row, int offset_column);
+    int count(int column, int row, int offset_row, int offset_column);
 
-    bool is_win(unsigned int action);
+    bool is_win(int action);
 
     bool is_draw();
 
-    std::vector<int> is_terminal(unsigned int action);
+    std::vector<int> is_terminal(int action);
 
-    void move(unsigned int action);
+    void move(int action);
 
-    void unmove(unsigned int action);
+    void unmove(int action);
 
     void flip();
 
-    std::vector<unsigned int> legal();
+    std::vector<int> legal();
 
     std::vector<std::vector<int>> inline get_state() const{
         return state;

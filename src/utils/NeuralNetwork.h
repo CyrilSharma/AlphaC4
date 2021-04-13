@@ -18,7 +18,7 @@ class NeuralNetwork {
 public:
     using return_type = std::vector<std::vector<float>>;
 
-    NeuralNetwork(std::string model_path, unsigned int batch_size, std::vector<unsigned int> board_dims);
+    NeuralNetwork(std::string model_path, unsigned int batch_size, std::vector<int> board_dims);
     ~NeuralNetwork();
 
     //std::future is used for asynchronous tasks
@@ -29,7 +29,7 @@ public:
     };
 
 private:
-    // not sure about this, there should be two returns no?
+    // std::vector<float> is the condensed board state
     using task_type = std::pair<std::vector<float>, std::promise<return_type>>;
 
     void predict();

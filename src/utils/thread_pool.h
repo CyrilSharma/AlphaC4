@@ -5,8 +5,6 @@
 #ifndef CONNECT_4_THREAD_POOL_H
 #define CONNECT_4_THREAD_POOL_H
 
-#endif //CONNECT_4_THREAD_POOL_H
-
 #include <vector>
 #include <queue>
 #include <thread>
@@ -24,7 +22,7 @@ public:
         this->run.store(true);
         this->idl_thread_num = thread_num;
 
-        for (unsigned int i = 0; i < thread_num; ++i) {
+        for (unsigned int i = 0; i < thread_num; i++) {
             // thread type implicit conversion
             pool.emplace_back([this] {
                 while (this->run) {
@@ -103,3 +101,5 @@ private:
     std::atomic<bool> run;                    // is running
     std::atomic<unsigned int> idl_thread_num; // idle thread number
 };
+
+#endif //CONNECT_4_THREAD_POOL_H

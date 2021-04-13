@@ -19,31 +19,35 @@
 #include <chrono>
 
 // Node
-Node::Node()
+Node::Node(int num_actions)
         : parent(nullptr),
           virtual_loss(0),
+          children(num_actions, nullptr),
           visits(0),
           prob(0),
           action(-1),
+          expanded(false),
           q(0) {}
 
-Node::Node(Node *parent, unsigned int action, float prob, unsigned int num_actions)
+Node::Node(Node *parent, int action, float prob, int num_actions)
         : parent(parent),
           children(num_actions, nullptr),
           virtual_loss(0),
+          action(action),
           visits(0),
           prob(prob),
+          expanded(false),
           q(0) {}
 
 Node::Node(const Node &node) {
     // Atomic types cannot be copied, so a custom copy function is needed
     this->parent = node.parent;
     this->children = node.children;
-
+    this->action = node.action;
     this->visits.store(node.visits.load());
     this->prob = node.prob;
     this->q = node.q;
-
+    this->expanded = node.expanded;
     this->virtual_loss.store(node.virtual_loss.load());
 }
 
@@ -56,7 +60,7 @@ Node &Node::operator=(const Node &node) {
     // struct
     this->parent = node.parent;
     this->children = node.children;
-
+    this->expanded = node.expanded;
     this->visits.store(node.visits.load());
     this->action = node.action;
     this->prob = node.prob;
@@ -66,20 +70,19 @@ Node &Node::operator=(const Node &node) {
     return *this;
 }
 
-unsigned int Node::best_child(float c_puct, float c_virtual_loss) {
-    float best_value = -DBL_MAX;
-    unsigned int best_move = 0;
+int Node::best_child(float c_puct, float c_virtual_loss) {
+    float best_value = -FLT_MAX;
+    int best_move = 0;
     Node *best_node;
 
-    for (unsigned int i = 0; i < children.size(); i++) {
+    for (int i = 0; i < children.size(); i++) {
         // empty node
         if (children[i] == nullptr) {
             continue;
         }
 
-        unsigned int total_child_visits = this->visits.load() + 1;
-        float cur_value =
-                children[i]->PUCT(c_puct, c_virtual_loss, total_child_visits);
+        int total_child_visits = this->visits.load() + 1;
+        float cur_value = children[i]->PUCT(c_puct, c_virtual_loss, total_child_visits);
         if (cur_value > best_value) {
             best_value = cur_value;
             best_move = i;
@@ -100,7 +103,7 @@ void Node::expand(const std::vector<float> &child_probs) {
 
         if (!this->expanded) {
 
-            for (unsigned int i = 0; i < children.size(); i++) {
+            for (int i = 0; i < children.size(); i++) {
                 // illegal action
                 if (abs(child_probs[i] - 0) < FLT_EPSILON) {
                     continue;
@@ -123,7 +126,7 @@ void Node::backup(float value) {
     this->virtual_loss--;
 
     // update visits
-    unsigned int visits = this->visits.load();
+    int visits = this->visits.load();
     this->visits++;
 
     // update q
@@ -134,7 +137,7 @@ void Node::backup(float value) {
 }
 
 float Node::PUCT(float c_puct, float c_virtual_loss,
-                           unsigned int total_child_visits) const {
+                           int total_child_visits) const {
     // u
     auto visits = this->visits.load();
     float u = (c_puct * this->prob * sqrt(total_child_visits) / (1 + visits));
@@ -152,13 +155,16 @@ float Node::PUCT(float c_puct, float c_virtual_loss,
 }
 
 // utils
-MCTS::MCTS(NeuralNetwork *neural_network, unsigned int num_threads, float c_puct, float c_virtual_loss, unsigned int num_actions)
-        : neural_network(neural_network),
-          thread_pool(new ThreadPool(num_threads)),
-          c_puct(c_puct),
-          c_virtual_loss(c_virtual_loss),
-          num_actions(num_actions),
-          root(new Node(nullptr, 1., 0, num_actions), MCTS::tree_deleter){}
+MCTS::MCTS(const std::string model_path, const int batch_size, const std::vector<int> board_dims,
+           const int num_threads, float c_puct, float c_virtual_loss, const int num_actions):
+           neural_network(NeuralNetwork(model_path, batch_size, board_dims)),
+           thread_pool(new ThreadPool(num_threads)),
+           c_puct(c_puct),
+           c_virtual_loss(c_virtual_loss),
+           num_actions(num_actions),
+           num_sims(30),
+           root(new Node(nullptr, -1, 0, num_actions), MCTS::tree_deleter)
+           {}
 
 void MCTS::shift_root(int last_action) {
     auto old_root = this->root.get();
@@ -186,7 +192,7 @@ void MCTS::tree_deleter(Node *t) {
     }
 
     // remove children
-    for (unsigned int i = 0; i < t->children.size(); i++) {
+    for (int i = 0; i < t->children.size(); i++) {
         if (t->children[i]) {
             tree_deleter(t->children[i]);
         }
@@ -202,10 +208,10 @@ std::vector<float> MCTS::final_probs(C4 *c4, float temp) {
     std::vector<std::future<void>> futures;
 
     // replace with a time dependent loop
-    for (unsigned int i = 0; i < this->num_sims; i++) {
+    for (int i = 0; i < num_sims; i++) {
         // copy board
         auto game = std::make_shared<C4>(*c4);
-        auto future = this->thread_pool->commit(std::bind(&MCTS::update, this, game));
+        auto future = thread_pool->commit(std::bind(&MCTS::update, this, game));
 
         // you can't copy future so instead you can copy a reference to future with move
         futures.emplace_back(std::move(future));
@@ -213,21 +219,21 @@ std::vector<float> MCTS::final_probs(C4 *c4, float temp) {
 
     // asynchronous tasks have already started
     // results are now waited for
-    for (unsigned int i = 0; i < futures.size(); i++) {
+    for (int i = 0; i < futures.size(); i++) {
         futures[i].wait();
     }
 
     // calculate probs
     std::vector<float> action_probs(num_actions, 0);
-    const auto &children = this->root->children;
+    const auto &children = root->children;
 
     // according to the alphazero paper, the temperature was set to an infinitesimal to approximate a greedy policy
     // this chooses whatever action had the most visits
     if (temp - 1e-3 < FLT_EPSILON) {
-        unsigned int max_count = 0;
-        unsigned int best_action = 0;
+        int max_count = 0;
+        int best_action = 0;
 
-        for (unsigned int i = 0; i < children.size(); i++) {
+        for (int i = 0; i < children.size(); i++) {
             // if child exists and number of child visits is greater then the max
             if (children[i] && children[i]->visits.load() > max_count) {
                 max_count = children[i]->visits.load();
@@ -242,7 +248,7 @@ std::vector<float> MCTS::final_probs(C4 *c4, float temp) {
     } else {
         // explore
         float sum = 0;
-        for (unsigned int i = 0; i < children.size(); i++) {
+        for (int i = 0; i < children.size(); i++) {
             if (children[i] && children[i]->visits.load() > 0) {
                 action_probs[i] = pow(children[i]->visits.load(), 1 / temp);
                 sum += action_probs[i];
@@ -261,7 +267,7 @@ std::vector<float> MCTS::final_probs(C4 *c4, float temp) {
 void MCTS::update(std::shared_ptr<C4> game) {
 
     auto node = this->root.get();
-    unsigned int action;
+    int action = node->action;
 
     while (true) {
         if (!node->expanded) {
@@ -274,9 +280,17 @@ void MCTS::update(std::shared_ptr<C4> game) {
         node = node->children[action];
     }
 
+    std::vector<int> status;
     // get game status
-    auto status = game->is_terminal(action);
-    float value = 0;
+    if (action == -1) {
+        status = {0, 0};
+    }
+    else {
+        status = game->is_terminal(action);
+    }
+
+
+    float value;
 
     // if not terminal
     if (status[0] == 0) {
@@ -284,7 +298,7 @@ void MCTS::update(std::shared_ptr<C4> game) {
         std::vector<float> probs(num_actions, 0);
 
         // Feeds the raw pointer into class neural network
-        auto future = this->neural_network->commit(game.get());
+        auto future = neural_network.commit(game.get());
         auto result = future.get();
 
         probs = result[0];
@@ -295,7 +309,7 @@ void MCTS::update(std::shared_ptr<C4> game) {
 
         // sum legal action values
         float sum = 0;
-        for (unsigned int i = 0; i < num_actions; i++) {
+        for (int i = 0; i < num_actions; i++) {
             if (legal_moves[i] == 1) {
                 sum += probs[i];
             } else {
@@ -320,7 +334,7 @@ void MCTS::update(std::shared_ptr<C4> game) {
             sum = std::accumulate(legal_moves.begin(), legal_moves.end(), 0);
 
             // initialize probs of legal moves to random distribution
-            for (unsigned int i = 0; i < probs.size(); i++) {
+            for (int i = 0; i < probs.size(); i++) {
                 probs[i] = legal_moves[i] / sum;
             }
         }
@@ -329,11 +343,27 @@ void MCTS::update(std::shared_ptr<C4> game) {
         node->expand(probs);
 
     } else {
-        //1 for win, 0 for draw, there is no -1 for loss as the game is never a loss from the final players perspective
+        // 1 for win, 0 for draw, there is no -1 for loss as the game is never a loss from the final players perspective
         value = status[1];
     }
 
     // value(parent -> node) = -value
     node->backup(value);
     return;
+}
+
+float MCTS::getCPuct() const {
+    return c_puct;
+}
+
+void MCTS::setCPuct(float cPuct) {
+    c_puct = cPuct;
+}
+
+float MCTS::getCVirtualLoss() const {
+    return c_virtual_loss;
+}
+
+void MCTS::setCVirtualLoss(float cVirtualLoss) {
+    c_virtual_loss = cVirtualLoss;
 }
