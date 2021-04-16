@@ -1,11 +1,5 @@
 from typing import Any, List, Sequence, Tuple
 import numpy as np
-import tensorflow as tf
-import tqdm
-from tensorflow import keras
-from tensorflow.keras import layers
-from kaggle_environments import evaluate, make, utils
-from ActorCritic import ActorCritic
 from termcolor import cprint
 
 COLUMN_HEIGHT = 6

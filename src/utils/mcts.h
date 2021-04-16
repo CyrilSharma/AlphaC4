@@ -10,11 +10,16 @@
 #include <vector>
 #include <thread>
 #include <atomic>
-
+#include <chrono>
 #include "C4.h"
 #include "NeuralNetwork.h"
 #include "thread_pool.h"
 #include <mutex>
+
+using std::chrono::high_resolution_clock;
+using std::chrono::duration_cast;
+using std::chrono::duration;
+using std::chrono::milliseconds;
 
 class Node {
 public:
@@ -26,15 +31,15 @@ public:
     // custom copy function because atomic type cannot be copied
     Node(const Node &node);
 
-    Node(Node *parent, int action, float prob, int num_actions);
+    Node(Node *parent, int action, double prob, int num_actions);
 
-    int best_child(float c_puct, float c_virtual_loss);
+    int best_child(double c_puct, double c_virtual_loss);
 
-    float PUCT(float c_puct, float c_virtual_loss, int total_child_visits) const;
+    double PUCT(double c_puct, double c_virtual_loss, int total_child_visits) const;
 
-    void expand(const std::vector<float> &child_probs);
+    void expand(const std::vector<double> &child_probs);
 
-    void backup(float leaf_value);
+    void backup(double leaf_value);
 
     Node* get_parent() const {
         return parent;
@@ -57,11 +62,11 @@ public:
         return expanded;
     }
 
-    float get_prob() const {
+    double get_prob() const {
         return prob;
     }
 
-    float get_q() const {
+    double get_q() const {
         return q;
     }
 
@@ -82,20 +87,21 @@ private:
 
     // atomic type is well behaved even with multiple threads accessing it
     std::atomic<int> visits;
-    float prob;
-    float q;
+    double prob;
+    double q;
     std::atomic<int> virtual_loss;
 };
 
 class MCTS {
 public:
-    MCTS(const std::string model_path, const int batch_size, const std::vector<int> board_dims,
-         const int num_threads, float c_puct, float c_virtual_loss, const int num_actions);
+    MCTS(std::string model_path, int num_threads = 1, int batch_size = 10,
+         std::vector<int> board_dims = {6, 7}, double c_puct = 4, double c_virtual_loss = 0.01,
+         int num_sims = 25, double timeout = 2);
 
     // method that will be run by multiple threads
     void update(std::shared_ptr<C4> game);
 
-    std::vector<float> final_probs(C4 *game, float temp = 1e-3);
+    std::vector<double> final_probs(C4 *game, double temp = 1e-3);
 
     void shift_root(int last_move);
 
@@ -103,13 +109,13 @@ public:
         return Node(*root);
     }
 
-    float getCPuct() const;
+    double getCPuct() const;
 
-    void setCPuct(float cPuct);
+    void setCPuct(double cPuct);
 
-    float getCVirtualLoss() const;
+    double getCVirtualLoss() const;
 
-    void setCVirtualLoss(float cVirtualLoss);
+    void setCVirtualLoss(double cVirtualLoss);
 
 private:
     static void tree_deleter(Node *t);
@@ -126,9 +132,11 @@ private:
 
     int num_actions;
 
-    float c_puct;
+    double c_puct;
 
-    float c_virtual_loss;
+    double c_virtual_loss;
+
+    duration<double, std::milli> timeout;
 };
 
 #endif //CONNECT_4_MCTS_H

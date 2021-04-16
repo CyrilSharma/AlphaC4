@@ -48,19 +48,26 @@ class Test_MCTS(unittest.TestCase):
         print('Initial State: ')
         render(state, [1, -1, 0])
 
-        tree = MCTS()
-        tree.set_state(state)
+        c4 = C4()
+        c4.state = state
+
+        tree = MCTS(num_threads=4)
 
         # Note that it's always assumed to be player one's turn
-        probs = tree.final_probs()
+        probs = tree.final_probs(c4, 1)
 
-        actions = list[range(params['columns'])]
+        print(probs)
 
-        action = np.random.choice(actions, probs)
+        children = tree.root.children
+
+        for i in range(len(children)):
+            print(children[i].visits)
+
+        actions = list(range(config['columns']))
+
+        action = np.random.choice(actions, p=probs)
 
         print('Algorithmn chose: ', action)
-
-        print(tree)
         print('_' * 30)
         self.assertTrue(action == 3)
     
@@ -89,17 +96,22 @@ class Test_MCTS(unittest.TestCase):
         print('Initial State: ')
         render(state, [1, -1, 0])
 
+        c4 = C4()
+
+        c4.state = state
+
         tree = MCTS()
-        tree.set_state(state)
 
         # Note that it's always assumed to be player one's turn
-        probs = tree.final_probs()
+        probs = tree.final_probs(c4, 1)
 
-        actions = list[range(params['columns'])]
+        print(probs)
 
-        action = np.random.choice(actions, probs)
+        actions = list(range(config['columns']))
 
-        print(tree)
+        action = np.random.choice(actions, p=probs)
+
+        print('Algorithmn chose: ', action)
         print('_' * 30)
 
         self.assertTrue(action == 3)

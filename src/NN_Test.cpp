@@ -32,7 +32,9 @@ TEST_CASE("Testing an untrained Network") {
     }
 
     SUBCASE("Testing with a larger batch size") {
-        auto nn = NeuralNetwork("../my_model", 2, {6, 7});
+
+        std::string model_path = "../my_model";
+        auto nn = NeuralNetwork(model_path, 2, {6, 7});
         auto c4 = new C4(6,7,4);
 
         std::vector<std::future<std::vector<std::vector<float>>>> futures;

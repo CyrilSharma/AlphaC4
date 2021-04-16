@@ -33,7 +33,7 @@ PYBIND11_MODULE(bindings, m) {
     py::class_<Node>(m, "Node")
     .def(py::init<int>(), py::arg("num_action") = 7)
     .def(py::init<const Node>())
-    .def(py::init<Node*, int, float, int>(), py::arg("Node"), py::arg("action"),
+    .def(py::init<Node*, int, double, int>(), py::arg("Node"), py::arg("action"),
          py::arg("prob"), py::arg("num_actions"))
     .def("best_child", &Node::best_child)
     .def("PUCT", &Node::PUCT)
@@ -51,13 +51,13 @@ PYBIND11_MODULE(bindings, m) {
     });
 
     py::class_<MCTS>(m, "MCTS")
-    .def(py::init<std::string, int, std::vector<int>, int, float, float, int>(),
-            py::arg("model_path") = "my_model", py::arg("batch_size") = 10, py::arg("board_dims") = BOARD_DIMS,
-            py::arg("num_threads") = 1, py::arg("c_puct") = 4, py::arg("c_virtual_loss") = 0.01,
-            py::arg("num_actions") = 7)
+    .def(py::init<std::string, int, int, std::vector<int>, double, double, int, double>(),
+            py::arg("model_path") = "my_model", py::arg("num_threads") = 1, py::arg("batch_size") = 10,
+            py::arg("board_dims") = BOARD_DIMS, py::arg("c_puct") = 4, py::arg("c_virtual_loss") = 0.01,
+            py::arg("num_sims") = 25, py::arg("timeout") = 2)
     .def("shift_root", &MCTS::shift_root)
     .def_property_readonly("root", &MCTS::get_root)
-    .def("final_probs", [](MCTS* mcts, C4 *c4, float temp) -> std::vector<float> {
+    .def("final_probs", [](MCTS* mcts, C4 *c4, double temp) -> std::vector<double> {
         py::gil_scoped_release release;
         auto probs = mcts->final_probs(c4, temp);
         py::gil_scoped_acquire acquire;
