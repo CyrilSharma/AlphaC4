@@ -1,40 +1,27 @@
+# %%
 import json
 from typing import Any, List, Sequence, Tuple
 
 import numpy as np
 import tensorflow as tf
 import tqdm
-from kaggle_environments import evaluate, make, utils
-from tensorflow import keras
-from tensorflow.keras import layers
 
+from tensorflow import keras
 from ActorCritic import ActorCritic
-from C4_Helpers import convert_state, render, legal
+from C4_Helpers import render
 from MCTS import SearchTree
 from matplotlib import pyplot as plt
 
-def main():
-    # Opening JSON file 
-    with open('parameters.json') as f:
-        params = json.load(f) 
-
-    with open('C4_Config.json') as f:
-        config = json.load(f) 
-
-    trainer = C4Trainer(params, config)
-    trainer.training_loop(display=True)
-
 class C4Trainer():
-    def __init__(self, params, config, input_shape=(1,6,7,1)):
-        self.env = make("connectx", config)
+    def __init__(self, model, params, config, input_shape=(1,6,7,1)):
         self.rows = config['rows']
         self.columns = config['columns']
         self.params = params
         self.config = config
-        self.model = ActorCritic()
+        self.model = model
         self.tree = SearchTree(self.model, params, config)
         self.input_dims = input_shape
-        self.optimizer = tf.keras.optimizers.Adam(learning_rate=params["alpha"])
+        self.optimizer = keras.optimizers.Adam(learning_rate=params["alpha"])
 
     @tf.function
     def call_model(self, state: tf.Tensor):
@@ -186,7 +173,7 @@ class C4Trainer():
         avg_reward = 0
     
         for ep_num in range(episodes):
-            # reset trees, and make tau non zeroo
+            # reset trees, and make tau non zero
             self.tree.reset()
             old_tree.reset()
             self.tree.set_tau(self.params['tau'])
@@ -286,3 +273,4 @@ class C4Trainer():
 
 if __name__ == '__main__':
     main()
+# %%
