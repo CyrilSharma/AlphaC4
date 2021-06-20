@@ -9,7 +9,9 @@ TEST_CASE("Single-threaded test") {
     std::vector<int> board_dims = {6, 7};
     auto tree = MCTS("../my_model");
     auto board = new C4(board_dims[0], board_dims[1], 4);
-    std::vector<double> probs = tree.final_probs(board, 1);
+    std::vector<std::vector<double>> result = tree.final_probs(board, 1);
+
+    auto probs  = result[1];
 
     auto root = tree.get_root();
 
@@ -30,7 +32,9 @@ TEST_CASE("Multi-threaded test") {
     int num_threads = 4;
     auto tree = MCTS("../my_model", num_threads);
     auto board = new C4(board_dims[0], board_dims[1], 4);
-    std::vector<double> probs = tree.final_probs(board, 1);
+    std::vector<std::vector<double>> result = tree.final_probs(board, 1);
+
+    auto probs  = result[1];
 
     auto root = tree.get_root();
 

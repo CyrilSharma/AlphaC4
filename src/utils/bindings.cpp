@@ -57,11 +57,11 @@ PYBIND11_MODULE(bindings, m) {
             py::arg("num_sims") = 25, py::arg("timeout") = 2)
     .def("shift_root", &MCTS::shift_root)
     .def_property_readonly("root", &MCTS::get_root)
-    .def("final_probs", [](MCTS* mcts, C4 *c4, double temp) -> std::vector<double> {
+    .def("final_probs", [](MCTS* mcts, C4 *c4, double temp) -> std::vector<std::vector<double>> {
         py::gil_scoped_release release;
-        auto probs = mcts->final_probs(c4, temp);
+        auto result = mcts->final_probs(c4, temp);
         py::gil_scoped_acquire acquire;
-        return probs;
+        return result;
     }, py::arg("board"), py::arg("temperature"))
     .def_property("c_puct", &MCTS::getCPuct, &MCTS::setCPuct)
     .def_property("c_virtual_loss", &MCTS::getCVirtualLoss, &MCTS::setCVirtualLoss)

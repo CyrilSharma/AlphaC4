@@ -6,8 +6,6 @@ set(CMAKE_CXX_STANDARD 17)
 
 set(SOURCE_DIR "src/utils")
 
-find_library(TENSORFLOW_LIB tensorflow HINT usr/local/lib)
-
 include_directories(lib/eigen-3.3.9)
 
 include_directories(lib/cppflow/include)

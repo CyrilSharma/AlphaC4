@@ -10,8 +10,8 @@ from tensorflow import keras
 from ActorCritic import ActorCritic
 from C4_Helpers import render
 from MCTS import SearchTree
+from Battle import battle
 from matplotlib import pyplot as plt
-
 class C4Trainer():
     def __init__(self, model, params, config, input_shape=(1,6,7,1)):
         self.rows = config['rows']
@@ -166,56 +166,21 @@ class C4Trainer():
 
         old_tree = SearchTree(model_old, self.params, self.config)
 
-        self.tree.reset()
-
-        trees = [self.tree, old_tree]
-
         avg_reward = 0
     
         for ep_num in range(episodes):
             # reset trees, and make tau non zero
             self.tree.reset()
             old_tree.reset()
-            self.tree.set_tau(self.params['tau'])
-            old_tree.set_tau(self.params['tau'])
 
-            player = np.random.randint(2)
+            swap = np.random.choice([True, False])
 
-            if player != 0:
-                action, _, terminal, win = old_tree.MCTS()
-                self.tree.shift_root(action)
-
-            terminal = False
-            i = 0
-            
-            while not terminal:
-                # after a few moves, play greedily
-                if i == self.params['exploratory_turns']:
-                    self.tree.set_tau(0)
-                    old_tree.set_tau(0)
-
-                action, _, terminal, win = trees[i % 2].MCTS()
-
-                if terminal:
-                    break
-
-                trees[(i + 1) % 2].shift_root(action)
-
-                i += 1
-            
-            if win:
-                if (i % 2) == 0:
-                    reward = 1
-                else:
-                    reward = -1
-            else:
-                reward = 0
-
-            render(trees[i%2].state * -1, [1, -1, 0])
+            reward = battle(self.tree, old_tree, swap)
 
             avg_reward += (reward - avg_reward) / (ep_num + 1)
         
-        self.tree.set_tau(self.params['tau'])
+        self.tree.reset()
+
         print(f'New network scored an average reward of: {avg_reward} against the old network.')
 
     def training_loop(self, display=True, save=True, graphs=True):
@@ -270,7 +235,3 @@ class C4Trainer():
                     
         if save:
             self.model.save("my_model", save_format='tf')
-
-if __name__ == '__main__':
-    main()
-# %%

@@ -11,8 +11,8 @@
 #include <future>
 #include <queue>
 #include "C4.h"
-#include <cppflow/cppflow.h>
-#include <tensorflow/c/c_api.h>
+#include "tensorflow/c/c_api.h"
+#include "cppflow/cppflow.h"
 
 class NeuralNetwork {
 public:

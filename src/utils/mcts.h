@@ -16,11 +16,6 @@
 #include "thread_pool.h"
 #include <mutex>
 
-using std::chrono::high_resolution_clock;
-using std::chrono::duration_cast;
-using std::chrono::duration;
-using std::chrono::milliseconds;
-
 class Node {
 public:
     // friend class can access private variables
@@ -101,7 +96,9 @@ public:
     // method that will be run by multiple threads
     void update(std::shared_ptr<C4> game);
 
-    std::vector<double> final_probs(C4 *game, double temp = 1e-3);
+    std::vector<std::vector<double>> predict(std::shared_ptr<C4> game);
+
+    std::vector<std::vector<double>> final_probs(C4 *game, double temp = 1e-3);
 
     void shift_root(int last_move);
 
@@ -132,11 +129,13 @@ private:
 
     int num_actions;
 
+    int num_threads;
+
     double c_puct;
 
     double c_virtual_loss;
 
-    duration<double, std::milli> timeout;
+    std::chrono::duration<double, std::milli> timeout;
 };
 
 #endif //CONNECT_4_MCTS_H

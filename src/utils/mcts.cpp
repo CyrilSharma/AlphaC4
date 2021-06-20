@@ -15,7 +15,6 @@
 #include <algorithm>
 #include <future>
 #include <functional>
-#include <chrono>
 
 // Node
 Node::Node(int num_actions)
@@ -154,17 +153,18 @@ double Node::PUCT(double c_puct, double c_virtual_loss,
 }
 
 // utils
-MCTS::MCTS(std::string model_path, int num_threads, int batch_size,
+MCTS::MCTS(std::string model_path, int threads, int batch_size,
            std::vector<int> board_dims, double c_puct, double c_virtual_loss, int num_sims,
-           double timeout):
+           double t):
            neural_network(NeuralNetwork(model_path, batch_size, board_dims)),
-           thread_pool(new ThreadPool(num_threads)),
+           thread_pool(new ThreadPool(threads)),
+           num_threads(threads),
            c_puct(c_puct),
            c_virtual_loss(c_virtual_loss),
            num_actions(board_dims[1]),
            num_sims(num_sims),
            root(new Node(nullptr, -1, 0, board_dims[1]), MCTS::tree_deleter),
-           timeout(duration_cast<milliseconds>(milliseconds(static_cast<int>(timeout * 1000))))
+           timeout(std::chrono::milliseconds((static_cast<int>(t * 1000))))
            {}
 
 void MCTS::shift_root(int last_action) {
@@ -203,16 +203,24 @@ void MCTS::tree_deleter(Node *t) {
     delete t;
 }
 
-std::vector<double> MCTS::final_probs(C4 *c4, double temp) {
-    auto tf = high_resolution_clock::now() + timeout;
+std::vector<std::vector<double>> MCTS::final_probs(C4 *c4, double temp) {
+
+    auto game = std::make_shared<C4>(*c4);
+    auto result = predict(game);
+    auto init_probs = result[0];
+    auto init_val = result[1];
+
+
+    auto tf = std::chrono::high_resolution_clock::now() + timeout;
 
     // submit update tasks to thread_pool
     // std::future is the standard means of accessing the results of asynchronous operations
     std::vector<std::future<void>> futures;
 
-    while (high_resolution_clock::now() < tf) {
-        // replace with a time dependent loop
-        for (int i = 0; i < num_sims; i++) {
+    // while the operation hasn't timed out
+    while (std::chrono::high_resolution_clock::now() < tf) {
+        // assign tasks to all four threads
+        for (int i = 0; i < 4; i++) {
             // copy board
             auto game = std::make_shared<C4>(*c4);
             auto future = thread_pool->commit(std::bind(&MCTS::update, this, game));
@@ -221,9 +229,9 @@ std::vector<double> MCTS::final_probs(C4 *c4, double temp) {
             futures.emplace_back(std::move(future));
         }
 
-        // asynchronous tasks have already started
         // results are now waited for
         for (int i = 0; i < futures.size(); i++) {
+            // blocks until result is ready
             futures[i].wait();
         }
 
@@ -249,7 +257,7 @@ std::vector<double> MCTS::final_probs(C4 *c4, double temp) {
         }
 
         action_probs[best_action] = 1.;
-        return action_probs;
+        return {init_probs, action_probs, init_val};
 
     //
     } else {
@@ -267,7 +275,7 @@ std::vector<double> MCTS::final_probs(C4 *c4, double temp) {
         std::for_each(action_probs.begin(), action_probs.end(),
                       [sum](double &x) { x /= sum; });
 
-        return action_probs;
+        return {init_probs, action_probs, init_val};
     }
 }
 
@@ -276,6 +284,7 @@ void MCTS::update(std::shared_ptr<C4> game) {
     auto node = this->root.get();
     int action = node->action;
 
+    // search down the tree until you reach a state that has not been explored
     while (true) {
         if (!node->expanded) {
             break;
@@ -302,48 +311,9 @@ void MCTS::update(std::shared_ptr<C4> game) {
     // if not terminal
     if (status[0] == 0) {
 
-        // Feeds the raw pointer into class neural network
-        auto future = neural_network.commit(game.get());
-        auto result = future.get();
-
-        // predict action_probs and value by neural network
-        std::vector<double> probs(result[0].begin(), result[0].end());
+        auto result = predict(game);
+        auto probs = result[0];
         value = result[1][0];
-
-        // mask invalid actions
-        auto legal_moves = game->legal();
-
-        // sum legal action values
-        double sum = 0;
-        for (int i = 0; i < num_actions; i++) {
-            if (legal_moves[i] == 1) {
-                sum += probs[i];
-            } else {
-                probs[i] = 0;
-            }
-        }
-
-        // renormalization
-        if (sum > FLT_EPSILON) {
-            std::for_each(probs.begin(), probs.end(),
-                          [sum](double &x) { x /= sum; });
-        } else {
-            // all masked
-
-            // NB! All valid moves may be masked if either your NNet architecture is
-            // insufficient or you've get overfitting or something else. If you have
-            // got dozens or hundreds of these messages you should pay attention to
-            // your NNet and/or training process.
-            std::cout << "All valid moves were masked, do workaround." << std::endl;
-
-            // number of legal moves
-            sum = std::accumulate(legal_moves.begin(), legal_moves.end(), 0);
-
-            // initialize probs of legal moves to random distribution
-            for (int i = 0; i < probs.size(); i++) {
-                probs[i] = legal_moves[i] / sum;
-            }
-        }
 
         // expand
         node->expand(probs);
@@ -356,6 +326,51 @@ void MCTS::update(std::shared_ptr<C4> game) {
     // value(parent -> node) = -value
     node->backup(value);
     return;
+}
+
+std::vector<std::vector<double>> MCTS::predict(std::shared_ptr<C4> game) {
+    auto future = neural_network.commit(game.get());
+    auto result = future.get();
+
+    // predict action_probs and value by neural network
+    std::vector<double> probs(result[0].begin(), result[0].end());
+    std::vector<double> value{ result[1][0] };
+
+    // mask invalid actions
+    auto legal_moves = game->legal();
+
+    // sum legal action values
+    double sum = 0;
+    for (int i = 0; i < num_actions; i++) {
+        if (legal_moves[i] == 1) {
+            sum += probs[i];
+        } else {
+            probs[i] = 0;
+        }
+    }
+
+    // renormalization
+    if (sum > FLT_EPSILON) {
+        std::for_each(probs.begin(), probs.end(),
+                      [sum](double &x) { x /= sum; });
+    } else {
+        // all masked
+        // NB! All valid moves may be masked if either your NNet architecture is
+        // insufficient or you've get overfitting or something else. If you have
+        // got dozens or hundreds of these messages you should pay attention to
+        // your NNet and/or training process.
+        std::cout << "All valid moves were masked, do workaround." << std::endl;
+
+        // number of legal moves
+        sum = std::accumulate(legal_moves.begin(), legal_moves.end(), 0);
+
+        // initialize probs of legal moves to random distribution
+        for (int i = 0; i < probs.size(); i++) {
+            probs[i] = legal_moves[i] / sum;
+        }
+    }
+
+    return {probs, value};
 }
 
 double MCTS::getCPuct() const {
