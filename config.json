@@ -2,5 +2,5 @@
     "rows": 6, 
     "columns": 7, 
     "inarow": 4,
-    "timeout": 2
+    "timeout": 1.0
 }

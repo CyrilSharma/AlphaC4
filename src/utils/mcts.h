@@ -89,9 +89,8 @@ private:
 
 class MCTS {
 public:
-    MCTS(std::string model_path, int num_threads = 1, int batch_size = 10,
-         std::vector<int> board_dims = {6, 7}, double c_puct = 4, double c_virtual_loss = 0.01,
-         int num_sims = 25, double timeout = 2);
+    MCTS(std::string model_path, int num_threads = 1, double timeout = 5, int batch_size = 10,
+         std::vector<int> board_dims = {6, 7}, double c_puct = 4, double c_virtual_loss = 0.01);
 
     // method that will be run by multiple threads
     void update(std::shared_ptr<C4> game);
@@ -122,10 +121,8 @@ private:
 
     // multithreading stuffs
     std::unique_ptr<ThreadPool> thread_pool;
-    NeuralNetwork neural_network;
 
-    // this value is to be determined empirically
-    int num_sims;
+    NeuralNetwork neural_network;
 
     int num_actions;
 
@@ -134,6 +131,12 @@ private:
     double c_puct;
 
     double c_virtual_loss;
+
+    std::vector<int> dims;
+
+    std::string path;
+
+    int batch_size;
 
     std::chrono::duration<double, std::milli> timeout;
 };

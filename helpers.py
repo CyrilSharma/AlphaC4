@@ -30,11 +30,11 @@ def render(state, token_nums=[1, -1, 0]):
         for token in row:
             # Print terms in color.
             if token == p1:
-                cprint('HHHH', 'red', end = " ")
+                cprint('HH', 'red', end = " ")
             elif token == p2:
-                cprint('HHHH', 'blue', end = " ")  
+                cprint('HH', 'blue', end = " ")  
             else:
-                print('HHHH', end = " ")
+                print('HH', end = " ")
         j -= 1
         # place next row on new line.
         print()
@@ -44,7 +44,7 @@ def render(state, token_nums=[1, -1, 0]):
 
     # print horizontal labels.
     for i in range(7):
-        print(i, end = "    ")
+        print(i, end = "  ")
     print("", end = "\n\n")
 
 

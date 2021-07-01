@@ -51,10 +51,10 @@ PYBIND11_MODULE(bindings, m) {
     });
 
     py::class_<MCTS>(m, "MCTS")
-    .def(py::init<std::string, int, int, std::vector<int>, double, double, int, double>(),
-            py::arg("model_path") = "my_model", py::arg("num_threads") = 1, py::arg("batch_size") = 10,
-            py::arg("board_dims") = BOARD_DIMS, py::arg("c_puct") = 4, py::arg("c_virtual_loss") = 0.01,
-            py::arg("num_sims") = 25, py::arg("timeout") = 2)
+    .def(py::init<std::string, int, double, int, std::vector<int>, double, double>(),
+            py::arg("model_path") = "my_model", py::arg("num_threads") = 1, py::arg("timeout") = 2,
+            py::arg("batch_size") = 10, py::arg("board_dims") = BOARD_DIMS, py::arg("c_puct") = 4,
+            py::arg("c_virtual_loss") = 0.01)
     .def("shift_root", &MCTS::shift_root)
     .def_property_readonly("root", &MCTS::get_root)
     .def("final_probs", [](MCTS* mcts, C4 *c4, double temp) -> std::vector<std::vector<double>> {

@@ -153,16 +153,17 @@ double Node::PUCT(double c_puct, double c_virtual_loss,
 }
 
 // utils
-MCTS::MCTS(std::string model_path, int threads, int batch_size,
-           std::vector<int> board_dims, double c_puct, double c_virtual_loss, int num_sims,
-           double t):
+MCTS::MCTS(std::string model_path, int threads, double t, int batch_size,
+           std::vector<int> board_dims, double c_puct, double c_virtual_loss):
            neural_network(NeuralNetwork(model_path, batch_size, board_dims)),
+           batch_size(batch_size),
+           path(model_path),
+           dims(board_dims),
            thread_pool(new ThreadPool(threads)),
            num_threads(threads),
            c_puct(c_puct),
            c_virtual_loss(c_virtual_loss),
            num_actions(board_dims[1]),
-           num_sims(num_sims),
            root(new Node(nullptr, -1, 0, board_dims[1]), MCTS::tree_deleter),
            timeout(std::chrono::milliseconds((static_cast<int>(t * 1000))))
            {}
