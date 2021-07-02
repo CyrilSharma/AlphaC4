@@ -38,22 +38,22 @@ def main():
         [1.,  1., 1., -1., 1., 1., 1.]], dtype=np.float32
     )
 
-    states = [state2, state3]
+    states = [state2, state3] #, state3]
     rewards = [-0.5, 0.2]
 
     model = ActorCritic()
 
     trainer = OverfitTrainer(model, params, config, states, rewards)
-    trainer.training_loop(300)
+    trainer.training_loop()
 
     model = keras.models.load_model('my_model', custom_objects={"ActorCritic": ActorCritic}, compile=False)
 
-    probs, val = model.predict(tf.convert_to_tensor(state2.reshape(1, 6, 7, 1), dtype=tf.float32))
-    print(probs)
+    action_vals, val = model.predict(tf.convert_to_tensor(state2.reshape(1, 6, 7, 1), dtype=tf.float32))
+    print(tf.nn.softmax(action_vals))
     print(val)
 
-    probs, val = model.predict(tf.convert_to_tensor(state3.reshape(1, 6, 7, 1), dtype=tf.float32))
-    print(probs)
+    action_vals, val = model.predict(tf.convert_to_tensor(state3.reshape(1, 6, 7, 1), dtype=tf.float32))
+    print(tf.nn.softmax(action_vals))
     print(val)
 
 main()

@@ -1,6 +1,7 @@
 import numpy as np
 import tensorflow as tf
-import tqdm
+from random import shuffle
+from tqdm import tqdm
 from tensorflow import keras
 from ActorCritic import ActorCritic
 from collections import deque
@@ -10,32 +11,22 @@ from Battle import battle
 from C4 import C4
 from matplotlib import pyplot as plt
 import sys
-
-
-
 class Trainer():
-    def __init__(self, model, params, config, input_shape=(1,6,7,1)):
+    def __init__(self, model: ActorCritic, params, config):
         self.rows = config['rows']
         self.columns = config['columns']
         self.params = params
         self.config = config
-        self.model = model
-        self.tree = MCTS(model, config["timeout"], params["c_puct"])
-        self.input_dims = input_shape
-        self.optimizer = keras.optimizers.Adam(learning_rate=params["alpha"])
+        self.model = compile_model(model, params)
+        self.history = []
 
-    def run_episode(self, player=1):
-        self.tree.reset()
+    def run_episode(self):
+        player = np.random.randint(2) * 2 - 1
+        episode_memory = []
         game = C4()
-
-        initial_prob_list = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True)
-        final_prob_list = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True)
-        values = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True)
 
         turn = 0
         terminal = False
-        
-        episode_memory = []
 
         while not terminal:
             # get data
@@ -48,79 +39,34 @@ class Trainer():
 
             if game.player == player:
                 # store value, and removes size 1 dimensions
-                values = values.write(turn, tf.squeeze(state_val))
-                initial_prob_list = initial_prob_list.write(turn, init_probs)
-                final_prob_list = final_prob_list.write(turn, final_probs)
-                episode_memory.append([game.state, final_probs, None])
+                episode_memory.append([game.state.reshape((self.rows,self.columns,1), dtype=tf.float32), final_probs, None])
                 turn += 1
-                
+
             reward, terminal = game.is_terminal(action)
 
-        if reward == 0:
-            reward = tf.constant(0, dtype=tf.float32)
-        else:
+        if reward != 0:
             if game.player == player:
-                reward = tf.constant(1, dtype=tf.float32)
+                reward = 1
             else:
-                reward = tf.constant(-1, dtype=tf.float32)
-        
-        # convert tensor array to tensor
-        initial_prob_list = initial_prob_list.stack()
-        final_prob_list = final_prob_list.stack()
-        values = values.stack()
+                reward = -1
 
-        # return initial_prob_list, final_prob_list, values, reward
-
-    def compute_loss(self, initial_prob_list: tf.Tensor, final_prob_list: tf.Tensor, values: tf.Tensor, rewards: tf.Tensor) -> tf.Tensor:
-        """Computes the combined actor-critic loss."""
-
-        c = self.params["c"]
-
-        variables = self.model.trainable_variables
-
-        loss_L2 = tf.add_n([ tf.nn.l2_loss(v) for v in variables if 'bias' not in v.name ]) * c
-
-        cross_entropy = tf.reduce_sum(tf.multiply(-final_prob_list, tf.log(initial_prob_list))) / len(final_prob_list)
-        print(f"final_prob_list {final_prob_list}")
-        print(f"initial_prob_list {initial_prob_list}")
-        print(f"cross entropy {cross_entropy}")
-        mse = tf.keras.losses.MeanSquaredError()
-        mse_loss = mse(rewards, values)
-        print(f"rewards {rewards}")
-        print(f"values {values}")
-        print(f"mse {mse_loss}")
-        loss = mse_loss + cross_entropy + loss_L2
-
-        # total loss is actor-critic loss
-        return loss
+        # update memory
+        return [(episode_memory[0], episode_memory[1], reward) for ep in episode_memory]
 
 
-    def train_step(self) -> tf.Tensor:
-
+    def train(self, training_data, args):
         """Runs a model training step."""
 
-        with tf.GradientTape() as tape:
-
-            # player is either +- 1
-            player = np.random.randint(2) * 2 - 1
-
-            # Run the model for one episode to collect training data
-            initial_prob_list, final_prob_list, values, reward = self.run_episode(player)
-
-            # THIS NEEDS TO CHANGE, REPLAY BUFFER NEEDS TO BE IMPLEMENTED
-            # Calculating loss values to update our network
-            loss = self.compute_loss(initial_prob_list, final_prob_list, values, reward)
+        boards, probs, values = list(zip(*training_data))
+        self.model.fit(x=np.stack(boards), y=[np.stack(probs), np.stack(values)], batch_size=args["batch_size"], 
+        epochs=args["epochs"])
         
-        # Where the magic happens...
+        print()
 
-        # Compute the gradients from the loss
-        grads = tape.gradient(loss, self.model.trainable_variables)
+        self.model.evaluate(x=np.stack(boards), y=[np.stack(probs), np.stack(values)], batch_size=args["batch_size"])
 
-        # Apply the gradients to the model's parameters
-        self.optimizer.apply_gradients(zip(grads, self.model.trainable_variables))
+        print(self.model.predict(np.stack(boards), batch_size=args["batch_size"]))
 
-        return reward.numpy(), loss.numpy()
-    
     def test_network(self, num, episodes=20):
 
         model_old = keras.models.load_model(f"Models/v{num}", compile=False)
@@ -146,45 +92,47 @@ class Trainer():
 
     def training_loop(self, save=True, graphs=True):
 
-        episodes = self.params["episodes"]
-        iters = self.params["iterations"]
+        episodes = self.params["num_eps"]
+        iterations = self.params["num_iters"]
 
-        running_reward = 0
-        running_loss = 0
+        for j in range(iterations):
+            iterMemory = deque([], maxlen=self.params["maxQueueLen"])
 
-        episode_nums = list(range(1, episodes + 1))
-        losses = [0 for num in range(episodes)]
+            for t in tqdm(range(episodes), desc="Self Play"):
+                self.tree = MCTS(self.model, self.config["timeout"], self.params["c_puct"])
+                iterMemory += self.run_episode()
+            
+            self.history.append(iterMemory)
 
-        version = 1
+            if len(self.history) > self.params["numStoredIters"]:
+                self.history.pop(0)
+            
+            trainingData = []
+            for e in self.history:
+                trainingData.extend(e)
+            shuffle(trainingData)
 
-        for j in range(iters):
-            with tqdm.trange(episodes) as t:
-
-                iterationTrainExamples = deque([], maxlen=self.params["maxlenOfQueue"])
-
-                for i in t:
-                    episode_reward, loss = self.train_step()
-
-                    if ((i % self.params["test_every"] - 1) == 0):
-                        #self.model.save(f"Models/v{version}", save_format='tf')
-                        #self.test_network(version - 1)
-                        version += 1
-
-                    losses.append(loss)
-
-                    running_reward = episode_reward*0.01 + running_reward*.99
-                    running_loss = loss * 0.01 + running_loss * .99
-
-                    t.set_description(f'Episode {i}')
-                    t.set_postfix(episode_loss=loss, running_loss=running_loss)
+            self.train(trainingData, self.params["training_args"])
 
         
         if graphs:
-            plt.title("Loss over time") 
-            plt.xlabel("Episode") 
-            plt.ylabel("Loss") 
-            plt.plot(episode_nums,losses) 
-            plt.show()
+            pass
                     
         if save:
             self.model.save("my_model")
+
+def compile_model(model, params):
+    losses = {'output_1':prob_loss, 'output_2':value_loss}
+    lossWeights={'output_1':0.5, 'output_2':0.5}
+    adam = keras.optimizers.Adam(learning_rate=params["alpha"])
+    model.compile(optimizer=adam, loss=losses, loss_weights=lossWeights)
+    return model
+
+def prob_loss(y_true, y_pred):
+    loss = tf.nn.softmax_cross_entropy_with_logits(labels=y_true, logits=y_pred)
+    return loss
+
+def value_loss(y_true, y_pred):
+    mse = tf.keras.losses.MeanSquaredError(reduction=tf.keras.losses.Reduction.NONE)
+    loss = mse(y_true, y_pred)
+    return loss

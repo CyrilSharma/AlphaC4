@@ -33,10 +33,10 @@ class ResidualBlock(keras.layers.Layer):
 
     def call(self, inputs):
         x = self.conv1(inputs)
-        x = self.batch_n1(x)
+        # x = self.batch_n1(x)
         x = tf.keras.activations.relu(x)
         x = self.conv2(x)
-        x = self.batch_n1(x)
+        # x = self.batch_n1(x)
         x = x + inputs
         x = tf.keras.activations.relu(x)
         return x
@@ -47,12 +47,12 @@ class PolicyBlock(keras.layers.Layer):
         self.conv1 = layers.Conv2D(filters, kernel_size=(2,2), padding="same", data_format="channels_last")
         self.batch_n1 = layers.BatchNormalization()
         self.flatten = tf.keras.layers.Flatten()
-        self.dense = layers.Dense(columns, activation="softmax")
+        self.dense = layers.Dense(columns)
 
 
     def call(self, inputs):
         x = self.conv1(inputs)
-        x = self.batch_n1(x)
+        # x = self.batch_n1(x)
         x = self.flatten(x)
         x = self.dense(x)
         return x
@@ -61,7 +61,7 @@ class ValueBlock(keras.layers.Layer):
     def __init__(self, filters=32, hidden_units=128):
         super().__init__()
         self.conv1 = layers.Conv2D(filters, kernel_size=(1,1), padding="same", data_format="channels_last")
-        self.batch_n1 = layers.BatchNormalization()
+        # self.batch_n1 = layers.BatchNormalization()
         self.flatten = tf.keras.layers.Flatten()
         self.dense1 = layers.Dense(hidden_units, activation="relu")
 
@@ -70,7 +70,7 @@ class ValueBlock(keras.layers.Layer):
 
     def call(self, inputs):
         x = self.conv1(inputs)
-        x = self.batch_n1(x)
+        # x = self.batch_n1(x)
         x = self.flatten(x)
         x = self.dense1(x)
         x = self.dense2(x)

@@ -16,18 +16,10 @@ params = {
     "cutoff": 0.05
 }
 
-config = {
-    "rows": 6, 
-    "columns": 7, 
-    "inarow": 4,
-    "timeout": 2,
-    "debug": True
-}
-
 class tester(unittest.TestCase):
     
     def test1(self):
-        print('\nTest 2')
+        print('\nTest 1')
         print('_' * 30, '\n')
 
         config = {
@@ -77,7 +69,7 @@ class tester(unittest.TestCase):
         self.assertTrue(action == 3)
     
     def test2(self):
-        print('\nTest 3')
+        print('\nTest 2')
         print('_' * 30, '\n')
         np.random.seed(42)
 

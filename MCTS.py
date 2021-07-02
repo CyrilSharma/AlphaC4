@@ -103,10 +103,7 @@ class MCTS():
         self.root = Node()
 
     def final_probs(self, C4, temp):
-
-        input_data = tf.convert_to_tensor(C4.state.reshape(self.model_dims), dtype=tf.float32)
-        init_probs, init_val = self.model(input_data)
-
+        init_probs, init_val = self.predict(C4)
         # initialize probs
         action_probs = np.zeros(self.num_actions)
 
@@ -146,9 +143,8 @@ class MCTS():
             # renormalization
             action_probs = action_probs / sum
 
-        action_probs = tf.convert_to_tensor(action_probs, dtype=tf.float32)
 
-        return (tf.squeeze(init_probs), action_probs, tf.squeeze(init_val))
+        return (init_probs, action_probs, init_val)
 
     def update(self, game):
 
@@ -232,6 +228,8 @@ class MCTS():
 
 @tf.function
 def call_model(model, input_data: tf.Tensor):
-    probs_tensor, value_tensor = model(input_data, training=False)
+    action_value_tensor, value_tensor = model(input_data, training=False)
+    # NOTE: This was changed! NN no longer outputs a softmax of probabilities!
+    probs_tensor = tf.nn.softmax(action_value_tensor)
     return (probs_tensor, value_tensor)
 

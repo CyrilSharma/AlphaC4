@@ -1,10 +1,18 @@
-{ 
-    "tau": 1.5,
+{
     "temp": 1,
-    "alpha": 0.000001,
+    "alpha": 0.00001,
     "c_puct": 1,
     "c": 0.001,
     "cutoff": 0.05,
     "test_every": 25,
-    "exploratory_turns": 6
+    "num_iters": 5,
+    "num_eps": 100,
+    "maxQueueLen": 10000,
+    "numStoredIters": 4,
+    "training_args": {
+        "lr": 0.001,
+        "epochs": 10,
+        "batch_size": 64,
+        "num_channels": 512
+    }
 }
