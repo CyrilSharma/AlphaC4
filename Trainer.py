@@ -7,10 +7,15 @@ from ActorCritic import ActorCritic
 from collections import deque
 from helpers import render
 from MCTS import MCTS
-from Battle import battle
+from Tournament import Tournament
 from C4 import C4
 from matplotlib import pyplot as plt
+from Evaluate import Evaluate
+import copy
 import sys
+import logging
+
+logging.basicConfig(filename='trainer.log', filemode='w', level=logging.DEBUG)
 class Trainer():
     def __init__(self, model: ActorCritic, params, config):
         self.rows = config['rows']
@@ -18,79 +23,70 @@ class Trainer():
         self.params = params
         self.config = config
         self.model = compile_model(model, params)
+        self.good_moves = []
+        self.perfect_moves = []
+        self.battle_outcomes = []
         self.history = []
 
     def run_episode(self):
-        player = np.random.randint(2) * 2 - 1
         episode_memory = []
         game = C4()
-
         turn = 0
+        actions = []
         terminal = False
+        temp = self.params["temp"]
 
         while not terminal:
             # get data
-            init_probs, final_probs, state_val = self.tree.final_probs(game, self.params["temp"])
+            final_probs, state_val = self.tree.final_probs(game, temp)
+            # store value, and removes size 1 dimensions
+            episode_memory.append([copy.deepcopy(game.state).reshape((self.rows,self.columns,1)) * game.player, final_probs, None, game.player])
 
             # choose action and modify state accordingly
-            action = np.random.choice([0,1,2,3,4,5,6], p=final_probs.numpy())
+            action = np.random.choice([0,1,2,3,4,5,6], p=final_probs)
+            actions.append(action)
             game.move(action)
             self.tree.shift_root(action)
 
-            if game.player == player:
-                # store value, and removes size 1 dimensions
-                episode_memory.append([game.state.reshape((self.rows,self.columns,1), dtype=tf.float32), final_probs, None])
-                turn += 1
-
             reward, terminal = game.is_terminal(action)
 
-        if reward != 0:
-            if game.player == player:
-                reward = 1
-            else:
-                reward = -1
+            # make agent play its best moves after x turns
+            turn += 1
+            if (turn > self.params["exp_turns"]):
+                temp = 0
 
+        logging.debug("Actions: " + str(actions))
+        logging.debug("\n" + np.array_str(game.state))
+        logging.debug(f"Winner: {-1 * reward * game.player}")
         # update memory
-        return [(episode_memory[0], episode_memory[1], reward) for ep in episode_memory]
+        return [(ep[0], ep[1], -1 * reward * game.player * ep[3]) for ep in episode_memory]
 
 
     def train(self, training_data, args):
         """Runs a model training step."""
-
         boards, probs, values = list(zip(*training_data))
         self.model.fit(x=np.stack(boards), y=[np.stack(probs), np.stack(values)], batch_size=args["batch_size"], 
         epochs=args["epochs"])
-        
-        print()
-
-        self.model.evaluate(x=np.stack(boards), y=[np.stack(probs), np.stack(values)], batch_size=args["batch_size"])
-
-        print(self.model.predict(np.stack(boards), batch_size=args["batch_size"]))
-
-    def test_network(self, num, episodes=20):
-
-        model_old = keras.models.load_model(f"Models/v{num}", compile=False)
-
-        old_tree = MCTS(model_old, config["timeout"], params["c_puct"])
-
-        avg_reward = 0
     
-        for ep_num in range(episodes):
-            # reset trees, and make tau non zero
-            self.tree.reset()
-            old_tree.reset()
-
-            swap = np.random.choice([True, False])
-
-            reward = battle(self.tree, old_tree, swap)
-
-            avg_reward += (reward - avg_reward) / (ep_num + 1)
+    def test(self):
+        old_model = keras.models.load_model("Models/v0", compile=False)
+        p2 = MCTS(old_model, self.params)
+        p1 = MCTS(self.model, self.params)
         
-        self.tree.reset()
+        avg_reward = Tournament(p1, p2, self.params["numBattles"])
+        self.battle_outcomes.append(avg_reward)
 
-        print(f'New network scored an average reward of: {avg_reward} against the old network.')
+        print(f'New network won {avg_reward * 100}% of the matches against the old network.')
 
-    def training_loop(self, save=True, graphs=True):
+        p1.reset()
+
+        # note that the dataset is of size 1000
+        good_moves, perfect_moves, mse = Evaluate(samples=200, agent=p1, sample_spacing=3)
+        print(f"good_moves: {good_moves * 100}% \nperfect_moves: {perfect_moves * 100}% \nstate mse: {mse}")
+        self.good_moves.append(good_moves * 100)
+        self.perfect_moves.append(perfect_moves * 100)
+
+    def training_loop(self, model_name, graphs=True):
 
         episodes = self.params["num_eps"]
         iterations = self.params["num_iters"]
@@ -99,7 +95,7 @@ class Trainer():
             iterMemory = deque([], maxlen=self.params["maxQueueLen"])
 
             for t in tqdm(range(episodes), desc="Self Play"):
-                self.tree = MCTS(self.model, self.config["timeout"], self.params["c_puct"])
+                self.tree = MCTS(self.model, self.params)
                 iterMemory += self.run_episode()
             
             self.history.append(iterMemory)
@@ -112,14 +108,31 @@ class Trainer():
                 trainingData.extend(e)
             shuffle(trainingData)
 
+            self.model.save(f"Models/v0", save_format='tf')
             self.train(trainingData, self.params["training_args"])
+            self.test()
+        
+        self.model.save(f"Models/{model_name}", save_format='tf')
 
         
         if graphs:
-            pass
-                    
-        if save:
-            self.model.save("my_model")
+            plt.title("Battle Outcomes") 
+            plt.xlabel("Iteration") 
+            plt.ylabel("Win Percentage") 
+            plt.plot(list(range(self.params["num_iters"])), self.battle_outcomes) 
+            plt.show()
+
+            plt.title("Good moves over time") 
+            plt.xlabel("Iteration") 
+            plt.ylabel("Percentage") 
+            plt.plot(list(range(self.params["num_iters"])), self.good_moves) 
+            plt.show()
+
+            plt.title("Perfect moves over time") 
+            plt.xlabel("Iteration") 
+            plt.ylabel("Percentage") 
+            plt.plot(list(range(self.params["num_iters"])), self.perfect_moves) 
+            plt.show()
 
 def compile_model(model, params):
     losses = {'output_1':prob_loss, 'output_2':value_loss}

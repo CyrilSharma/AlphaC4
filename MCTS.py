@@ -1,11 +1,13 @@
 import numpy as np
+from numpy.random import default_rng
 import time
 import tensorflow as tf
 import copy
 import sys
 from tqdm import tqdm
 from C4 import C4
-
+import logging
+import copy
 class Node():
     def __init__(self, num_actions=7, parent=None, action=-1, prob=0):
         self.parent = parent
@@ -14,7 +16,9 @@ class Node():
         self.prob = prob
         self.action = action
         self.expanded = False
-        self.q = 0
+        # for debugging
+        self.terminal = 0.0
+        self.q = 0.0
 
     def best_child(self, c_puct):
 
@@ -46,19 +50,24 @@ class Node():
                 self.children[i] = Node(parent=self, action=i, prob=child_probs[i], num_actions=len(self.children))
 
             self.expanded = True
+        else:
+            for i in range(len(self.children)):
+                # illegal action
+                if abs(child_probs[i]) < 0.000001:
+                    continue
 
+                self.children[i].prob = child_probs[i]
     def backup(self, value):
         # If it is not root, this node's parent should be updated first
         if (self.parent is not None):
             self.parent.backup(-value)
-
+        
         # update visits
-        visits = self.visits
         self.visits += 1
 
         # update q
-        # std::lock_guard<std::mutex> lock(self.lock)
-        self.q += (value - self.q) / (visits + 1)
+        self.q += (value - self.q) / self.visits
+
 
     def PUCT(self, c_puct, total_child_visits):
         # u
@@ -72,20 +81,20 @@ class Node():
             return u + self.q
 
 class MCTS():
-    def __init__(self, model, t, c_puct, board_dims=[6,7]):
+    def __init__(self, model, params, board_dims=[6,7]):
         self.model = model
-        self.model_dims = (1, board_dims[0], board_dims[1], 1)
+        self.model_dims = (board_dims[0], board_dims[1], 1)
         self.dims = board_dims
-        self.c_puct = c_puct
+        self.c_puct = params["c_puct"]
+        self.epsilon = params["epsilon"]
+        self.dirichlet = params["dirichlet"] 
         self.num_actions = board_dims[1]
         self.root = Node()
-        self.timeout = t
-
+        self.timeout = params["timeout"]
         # initial call to function to compile it
-        _, _ = call_model(self.model, tf.convert_to_tensor(np.zeros(self.model_dims), dtype=tf.float32))
+        # _, _ = call_model(self.model, tf.convert_to_tensor(np.zeros(self.model_dims), dtype=tf.float32))
 
     def shift_root(self, last_action):
-
         # reuse the child tree
         if (last_action >= 0 and self.root.children[last_action] is not None):
             # unlink
@@ -103,51 +112,81 @@ class MCTS():
         self.root = Node()
 
     def final_probs(self, C4, temp):
+        # adds noise to the root node.
+        # initial reading of state value is stored for testing purposes.
         init_probs, init_val = self.predict(C4)
+        probs = self.add_noise(C4, init_probs)
+        # add noise to root node only
+        self.root.expand(probs)
+
         # initialize probs
         action_probs = np.zeros(self.num_actions)
 
         t_0 = time.time()
         t_end = time.time() + self.timeout
 
-        i = 0
-
         while time.time() < t_end:
-            game = C4.clone()
+            game = copy.deepcopy(C4)
             self.update(game)
-            i += 1
 
         children = self.root.children
-    
+        visits = []
+        qs = []
+        terminals = []
+
         # this chooses whatever action had the most visits if the temp was 0
         if (temp - 1e-3 < 0.0000001):
             max_count = 0
             best_action = 0
-
             for i in range(len(children)):
+                visits.append(children[i].visits if children[i] is not None else -1)
+                qs.append("{:.2f}".format(round(children[i].q, 2)) if children[i] is not None else "Illegal")
+                terminals.append(children[i].terminal if children[i] is not None else "Illegal")
                 # if child exists and number of child visits is greater then the max
-                if (children[i] and children[i].visits > max_count):
+                if (children[i] is not None and children[i].visits > max_count):
                     max_count = children[i].visits
                     best_action = i
-
             action_probs[best_action] = 1.
 
         else:
             # explore
             sum = 0
             for i in range(len(children)):
-                if (children[i] is not None and children[i].visits > 0):
-                    action_probs[i] = pow(children[i].visits, 1 / temp)
-                    sum += action_probs[i]
+                if (children[i] is not None):
+                    visits.append(children[i].visits if children[i] is not None else -1)
+                    qs.append("{:.2f}".format(round(children[i].q, 2)) if children[i] is not None else "Illegal")
+                    terminals.append(children[i].terminal if children[i] is not None else "Illegal")
+                    if (children[i] is not None and children[i].visits > 0):
+                        action_probs[i] = pow(children[i].visits, 1 / temp)
+                        sum += action_probs[i]
 
             # renormalization
             action_probs = action_probs / sum
 
+        logging.debug("Visits: " + str(visits))
+        logging.debug("Qs: " + str(qs))
+        logging.debug("Terminals: " + str(terminals))
 
-        return (init_probs, action_probs, init_val)
+        return (action_probs, init_val)
+    
+    def add_noise(self, C4, init_probs):
+        legal_moves = C4.legal()
+        # dirichlet distribution over the legal moves
+        noise = self.epsilon * default_rng().dirichlet(self.dirichlet * np.ones(np.count_nonzero(legal_moves)))
+        probs = (1 - self.epsilon) * init_probs
+        
+        # add dirichlet noise to init_probs, then normalize
+        j = 0
+        for i in range(len(probs)):
+            if legal_moves[i] == 1:
+                probs[i] += noise[j]
+                j += 1
+
+        probs /= np.sum(probs)
+        
+        return probs
 
     def update(self, game):
-
         node = self.root
         action = node.action
 
@@ -161,24 +200,18 @@ class MCTS():
             game.move(action)
             node = node.children[action]
         
-        # get game status
-        if (action == -1):
-            reward, terminal = (0,0)
-        
-        else:
-            reward, terminal = game.is_terminal(action)
+        reward, terminal = game.is_terminal(action)
+
+        node.terminal = terminal
 
         # if not terminal
         if (terminal == 0):
-
-            result = self.predict(game)
-            probs = result[0]
-            value = result[1][0]
-
-            # expand
+            probs, value = self.predict(game)
             node.expand(probs)
+            reward = value
+        else:
+            print("", end="")
 
-        # value(parent . node) = -value
         node.backup(reward)
         return
 
@@ -187,7 +220,7 @@ class MCTS():
         probs_tensor, value_tensor = call_model(self.model, input_data)
 
         probs = probs_tensor[0].numpy()
-        value = value_tensor[0].numpy()
+        value = value_tensor[0].numpy().item()
 
         # mask invalid actions
         legal_moves = game.legal()

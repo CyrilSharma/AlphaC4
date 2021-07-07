@@ -1,6 +1,6 @@
 from MCTS import MCTS
 import numpy as np
-from C4_Helpers import render
+from helpers import render
 from ActorCritic import ActorCritic
 from C4 import C4
 

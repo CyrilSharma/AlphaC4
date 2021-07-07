@@ -1,61 +1,89 @@
 import json
-import numpy as np
-import tensorflow as tf
-import tqdm
-
-from tensorflow import keras
-import sys
-
-from ActorCritic import ActorCritic
-from helpers import render
-from MCTS import MCTS
 from C4 import C4
+from MCTS import MCTS
+from tqdm import tqdm
+import numpy as np
+from numpy.random import default_rng
+from helpers import render
+import logging
 
-def battle():
-    player = float(sys.argv[1])
+def win_loss_draw(score):
+    if score>0: 
+        return 'win'
+    if score<0: 
+        return 'loss'
+    return 'draw'
 
-    if player == 0:
-        player = np.random.randint(2) * 2 - 1
+def getData():
+    data = []
+    with open('c4-eval.txt') as f:
+        for line in f:
+            full_line = line
+            dict = json.loads(full_line)
+            data.append(dict)
+    return data
+
+def Evaluate(samples, agent: MCTS, sample_spacing=8, random=False):
+    data = getData()
+
+    if random:
+        rng = default_rng()
+        # grabs 100 unique samples
+        subset = rng.choice(data, size=samples,replace=False)
+    else:
+        subset = data[0:samples*sample_spacing:sample_spacing]
     
-    # Opening JSON file 
-    with open('parameters.json') as f:
-        params = json.load(f) 
+    moves = 0
+    state_error = 0
+    goodMoves = 0
+    perfectMoves = 0
+    agent_moves = np.zeros(7)
 
-    with open('config.json') as f:
-        config = json.load(f) 
+    for t in tqdm(range(samples), desc="Evaluation"):
+        agent.reset()
 
-    model = keras.models.load_model("my_model", compile=False)
-    tree = MCTS(model, config["timeout"], params["c_puct"])
+        datum = subset[t]
+        game = C4()
 
-    game = C4()
+        player = ((len([x for x in datum["board"] if x!=0]) + 1) % 2) * 2 - 1
+        board = np.array(datum["board"])
+        board = np.reshape(np.where(board == 2, -1, board), (6, 7))
 
-    turn = 0
-    terminal = False
+        game.player = player
+        game.state = board
 
-    while not terminal:
-        if (game.player == player):
-            render(game.state)
-            action = int(input("Which column?? "))
-            game.move(action)
-            tree.shift_root(action)
-            reward, terminal = game.is_terminal(action)
+        logging.debug("\n" + np.array_str(game.state))
+        final_probs, state_val = agent.final_probs(game, 0)
+        #agent_move = np.random.choice([0,1,2,3,4,5,6])
+        agent_move = np.argmax(final_probs)
+        agent_moves[agent_move] += 1
+
+        move_scores = np.array(datum["move score"])
+        best_score = np.max(move_scores)
+
+        logging.debug("Move scores: " + np.array_str(move_scores))
+
+        best_moves = [i for i in range(7) if move_scores[i]==best_score]
+
+        if agent_move in best_moves:
+            perfectMoves += 1
+            
+        if win_loss_draw(move_scores[agent_move]) == win_loss_draw(best_score):
+            goodMoves += 1
+    
+        if datum["score"] >= 1:
+            score = 1
+        elif datum["score"] <= -1:
+            score = -1
         else:
-            render(game.state)
-            # get data
-            init_probs, final_probs, state_val = tree.final_probs(game, 0)
-            print(f"\nInit probs: {init_probs.numpy()}")
-            print(f"Final probs: {final_probs.numpy()}")
+            score = 0
 
-            # choose action and modify state accordingly
-            action = np.random.choice([0,1,2,3,4,5,6], p=final_probs.numpy())
-
-            game.move(action)
-            tree.shift_root(action)
-            reward, terminal = game.is_terminal(action)
-    
-    render(game.state)
-
-
+        mse = (state_val - score) ** 2
+        state_error += (mse - state_error) / (moves + 1)
         
-if __name__ == '__main__':
-    battle()
+        moves += 1
+    
+    print(f"Agent Moves: {agent_moves}")
+    return (goodMoves / moves, perfectMoves / moves, state_error)
+
+

@@ -22,7 +22,7 @@ class OverfitTrainer(Trainer):
         game.state = copy.deepcopy(self.states[index])
         reward = self.rewards[index]
 
-        init_probs, final_probs, state_val = self.tree.final_probs(game, self.params["temp"])
+        final_probs, state_val = self.tree.final_probs(game, self.params["temp"])
 
         # update memory
         return [(game.state.reshape(self.rows, self.columns, 1), final_probs, reward)]

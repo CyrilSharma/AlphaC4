@@ -92,11 +92,3 @@ class C4():
             i += 1
 
         return legal_actions
-    
-    def clone(self):
-        game = C4(self.rows, self.columns, self.inarow)
-        for i in range(self.rows):
-            for j in range(self.columns):
-                game.state[i][j] = self.state[i][j]
-
-        return game

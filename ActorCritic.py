@@ -12,7 +12,7 @@ class ActorCritic(tf.keras.Model):
   def __init__(self, filters=32):
     """Initialize."""
     super().__init__()
-    self.tower_height = 10
+    self.tower_height = 15
     self.common = [ResidualBlock() for i in range(self.tower_height)]
     self.actor = PolicyBlock()
     self.critic = ValueBlock()
@@ -27,7 +27,7 @@ class ResidualBlock(keras.layers.Layer):
     def __init__(self, filters=32):
         super().__init__()
         self.conv1 = layers.Conv2D(filters, kernel_size=(4,4), padding="same", data_format="channels_last", input_shape=(1,6,7,1))
-        self.batch_n1 = layers.BatchNormalization()
+        # self.batch_n1 = layers.BatchNormalization()
         self.conv2 = layers.Conv2D(filters, kernel_size=(4,4), padding="same", data_format="channels_last")
 
 
@@ -45,7 +45,7 @@ class PolicyBlock(keras.layers.Layer):
     def __init__(self, columns=7, filters=32):
         super().__init__()
         self.conv1 = layers.Conv2D(filters, kernel_size=(2,2), padding="same", data_format="channels_last")
-        self.batch_n1 = layers.BatchNormalization()
+        # self.batch_n1 = layers.BatchNormalization()
         self.flatten = tf.keras.layers.Flatten()
         self.dense = layers.Dense(columns)
 
