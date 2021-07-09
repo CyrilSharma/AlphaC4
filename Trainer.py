@@ -11,11 +11,14 @@ from Tournament import Tournament
 from C4 import C4
 from matplotlib import pyplot as plt
 from Evaluate import Evaluate
+from tensorflow_addons.optimizers import CyclicalLearningRate
 import copy
 import sys
 import logging
 
 logging.basicConfig(filename='trainer.log', filemode='w', level=logging.DEBUG)
+logging.info("Starting Training")
+
 class Trainer():
     def __init__(self, model: ActorCritic, params, config):
         self.rows = config['rows']
@@ -53,7 +56,7 @@ class Trainer():
             # make agent play its best moves after x turns
             turn += 1
             if (turn > self.params["exp_turns"]):
-                temp = 0
+                temp = 0.5
 
         logging.debug("Actions: " + str(actions))
         logging.debug("\n" + np.array_str(game.state))
@@ -64,14 +67,19 @@ class Trainer():
 
     def train(self, training_data, args):
         """Runs a model training step."""
+        
         boards, probs, values = list(zip(*training_data))
         self.model.fit(x=np.stack(boards), y=[np.stack(probs), np.stack(values)], batch_size=args["batch_size"], 
         epochs=args["epochs"])
     
     def test(self):
         old_model = keras.models.load_model("Models/v0", compile=False)
-        p2 = MCTS(old_model, self.params)
-        p1 = MCTS(self.model, self.params)
+
+        params = copy.deepcopy(self.params)
+        params["timeout"] = 0.50
+
+        p2 = MCTS(old_model, params)
+        p1 = MCTS(self.model, params)
         
         avg_reward = Tournament(p1, p2, self.params["numBattles"])
         self.battle_outcomes.append(avg_reward)
@@ -81,7 +89,7 @@ class Trainer():
         p1.reset()
 
         # note that the dataset is of size 1000
-        good_moves, perfect_moves, mse = Evaluate(samples=200, agent=p1, sample_spacing=3)
+        good_moves, perfect_moves, mse = Evaluate(samples=100, agent=p1, sample_spacing=3)
         print(f"good_moves: {good_moves * 100}% \nperfect_moves: {perfect_moves * 100}% \nstate mse: {mse}")
         self.good_moves.append(good_moves * 100)
         self.perfect_moves.append(perfect_moves * 100)
@@ -135,9 +143,11 @@ class Trainer():
             plt.show()
 
 def compile_model(model, params):
+    args = params["training_args"]
     losses = {'output_1':prob_loss, 'output_2':value_loss}
-    lossWeights={'output_1':0.5, 'output_2':0.5}
-    adam = keras.optimizers.Adam(learning_rate=params["alpha"])
+    lossWeights={'output_1':0.7, 'output_2':0.3}
+    cyclical_learning_rate = CyclicalLearningRate(initial_learning_rate=args["lr_min"], maximal_learning_rate=args["lr_max"], step_size=(int(3 * params["maxQueueLen"] / args["batch_size"])), scale_fn=lambda x: 1 / (2.0 ** (x - 1)), scale_mode='cycle')
+    adam = keras.optimizers.Adam(learning_rate=cyclical_learning_rate)
     model.compile(optimizer=adam, loss=losses, loss_weights=lossWeights)
     return model
 

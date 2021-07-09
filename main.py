@@ -12,7 +12,7 @@ def main():
         config = json.load(file)
     
     model = ActorCritic()
-    model_name = "first_model"
+    model_name = "second_model"
 
     trainer = Trainer(model, params, config)
     trainer.training_loop(model_name)

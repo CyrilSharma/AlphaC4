@@ -5,6 +5,7 @@ from tqdm import tqdm
 import numpy as np
 from numpy.random import default_rng
 from helpers import render
+from tensorflow import keras
 import logging
 
 def win_loss_draw(score):
@@ -14,9 +15,9 @@ def win_loss_draw(score):
         return 'loss'
     return 'draw'
 
-def getData():
+def getData(filename):
     data = []
-    with open('c4-eval.txt') as f:
+    with open(filename) as f:
         for line in f:
             full_line = line
             dict = json.loads(full_line)
@@ -24,7 +25,7 @@ def getData():
     return data
 
 def Evaluate(samples, agent: MCTS, sample_spacing=8, random=False):
-    data = getData()
+    data = getData('c4-eval.txt')
 
     if random:
         rng = default_rng()
@@ -86,4 +87,20 @@ def Evaluate(samples, agent: MCTS, sample_spacing=8, random=False):
     print(f"Agent Moves: {agent_moves}")
     return (goodMoves / moves, perfectMoves / moves, state_error)
 
+def Replay(actions):
+    game = C4()
+    for action in actions:
+        render(game.state)
+        game.move(action)
+    render(game.state)
 
+if __name__ == "__main__":
+    with open('parameters.json') as file:
+        params = json.load(file)
+    params["timeout"] = 2.0
+    model = keras.models.load_model("Models/first_model", compile=False)
+    agent = MCTS(model, params)
+    good, perfect, state_error = Evaluate(800, agent, sample_spacing=1)
+    print(f"Good Moves: {good}")
+    print(f"Perfect Moves: {perfect}")
+    print(f"State Error: {state_error}")

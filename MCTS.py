@@ -36,7 +36,6 @@ class Node():
             if (cur_value > best_value):
                 best_value = cur_value
                 best_move = i
-                best_node = self.children[i]
 
         return best_move
 
@@ -56,7 +55,9 @@ class Node():
                 if abs(child_probs[i]) < 0.000001:
                     continue
 
-                self.children[i].prob = child_probs[i]
+                if (self.children[i] is not None):
+                    self.children[i].prob = child_probs[i]
+                    
     def backup(self, value):
         # If it is not root, this node's parent should be updated first
         if (self.parent is not None):
@@ -83,7 +84,7 @@ class Node():
 class MCTS():
     def __init__(self, model, params, board_dims=[6,7]):
         self.model = model
-        self.model_dims = (board_dims[0], board_dims[1], 1)
+        self.model_dims = (1, board_dims[0], board_dims[1], 1)
         self.dims = board_dims
         self.c_puct = params["c_puct"]
         self.epsilon = params["epsilon"]
@@ -92,7 +93,7 @@ class MCTS():
         self.root = Node()
         self.timeout = params["timeout"]
         # initial call to function to compile it
-        # _, _ = call_model(self.model, tf.convert_to_tensor(np.zeros(self.model_dims), dtype=tf.float32))
+        _, _ = call_model(self.model, tf.convert_to_tensor(np.zeros(self.model_dims), dtype=tf.float32))
 
     def shift_root(self, last_action):
         # reuse the child tree
@@ -216,7 +217,7 @@ class MCTS():
         return
 
     def predict(self, game):
-        input_data = tf.convert_to_tensor(game.state.reshape(self.model_dims) * game.player, dtype=tf.float32)
+        input_data = tf.convert_to_tensor(copy.deepcopy(game.state).reshape(self.model_dims) * game.player, dtype=tf.float32)
         probs_tensor, value_tensor = call_model(self.model, input_data)
 
         probs = probs_tensor[0].numpy()

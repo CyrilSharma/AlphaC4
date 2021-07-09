@@ -1,19 +1,20 @@
 {
     "temp": 1,
     "numBattles": 10,
-    "alpha": 0.00001,
     "c_puct": 3.0,
     "c": 0.001,
     "dirichlet": 1.5,
     "epsilon": 0.25,
-    "exp_turns": 8,
+    "exp_turns": 42,
     "timeout": 1.5,
-    "num_iters": 30,
+    "num_iters": 40,
     "num_eps": 50,
-    "maxQueueLen": 12000,
-    "numStoredIters": 4,
+    "maxQueueLen": 5000,
+    "numStoredIters": 3,
     "training_args": {
         "epochs": 10,
-        "batch_size": 64
+        "batch_size": 256,
+        "lr_min": 0.0000001,
+        "lr_max": 0.00001
     }
 }

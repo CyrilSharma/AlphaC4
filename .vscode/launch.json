@@ -8,7 +8,7 @@
             "name": "Test convergence",
             "type": "python",
             "request": "launch",
-            "module": "tests.test-convergence"
+            "module": "tests.test_convergence"
         },
         {
             "name": "Python: Current File",
