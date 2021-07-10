@@ -43,7 +43,7 @@ class Node():
         if (not self.expanded):
             for i in range(len(self.children)):
                 # illegal action
-                if abs(child_probs[i]) < 0.000001:
+                if abs(child_probs[i]) < np.finfo(np.float32).eps:
                     continue
 
                 self.children[i] = Node(parent=self, action=i, prob=child_probs[i], num_actions=len(self.children))
@@ -52,7 +52,7 @@ class Node():
         else:
             for i in range(len(self.children)):
                 # illegal action
-                if abs(child_probs[i]) < 0.000001:
+                if abs(child_probs[i]) < np.finfo(np.float32).eps:
                     continue
 
                 if (self.children[i] is not None):
@@ -92,6 +92,7 @@ class MCTS():
         self.num_actions = board_dims[1]
         self.root = Node()
         self.timeout = params["timeout"]
+        self.num_sims = params["num_sims"]
         # initial call to function to compile it
         _, _ = call_model(self.model, tf.convert_to_tensor(np.zeros(self.model_dims), dtype=tf.float32))
 
@@ -117,6 +118,7 @@ class MCTS():
         # initial reading of state value is stored for testing purposes.
         init_probs, init_val = self.predict(C4)
         probs = self.add_noise(C4, init_probs)
+        
         # add noise to root node only
         self.root.expand(probs)
 
@@ -125,48 +127,60 @@ class MCTS():
 
         t_0 = time.time()
         t_end = time.time() + self.timeout
+        i = 0
 
-        while time.time() < t_end:
+        # don't spend more then self.timeout seconds on this and don't do more then simulations than self.num_sims
+        while time.time() < t_end and i < self.num_sims:
             game = copy.deepcopy(C4)
             self.update(game)
+            i += 1
 
         children = self.root.children
+
+        # for logging purposes
+        probs = []
         visits = []
         qs = []
         terminals = []
 
         # this chooses whatever action had the most visits if the temp was 0
-        if (temp - 1e-3 < 0.0000001):
+        if (temp - 1e-3 < 0.001):
             max_count = 0
             best_action = 0
-            for i in range(len(children)):
-                visits.append(children[i].visits if children[i] is not None else -1)
+            for i in range(self.dims[1]):
+                probs.append("{:.2f}".format(round(children[i].prob, 2)) if children[i] is not None else "Illegal")
+                visits.append(children[i].visits if children[i] is not None else "Illegal")
                 qs.append("{:.2f}".format(round(children[i].q, 2)) if children[i] is not None else "Illegal")
                 terminals.append(children[i].terminal if children[i] is not None else "Illegal")
+
                 # if child exists and number of child visits is greater then the max
                 if (children[i] is not None and children[i].visits > max_count):
                     max_count = children[i].visits
                     best_action = i
+
             action_probs[best_action] = 1.
 
         else:
             # explore
             sum = 0
-            for i in range(len(children)):
-                if (children[i] is not None):
-                    visits.append(children[i].visits if children[i] is not None else -1)
-                    qs.append("{:.2f}".format(round(children[i].q, 2)) if children[i] is not None else "Illegal")
-                    terminals.append(children[i].terminal if children[i] is not None else "Illegal")
-                    if (children[i] is not None and children[i].visits > 0):
-                        action_probs[i] = pow(children[i].visits, 1 / temp)
-                        sum += action_probs[i]
+            for i in range(self.dims[1]):
+                probs.append("{:.2f}".format(round(children[i].prob,2)) if children[i] is not None else "Illegal")
+                visits.append(children[i].visits if children[i] is not None else "Illegal")
+                qs.append("{:.2f}".format(round(children[i].q, 2)) if children[i] is not None else "Illegal")
+                terminals.append(children[i].terminal if children[i] is not None else "Illegal")
+
+                if (children[i] is not None and children[i].visits > 0):
+                    action_probs[i] = pow(children[i].visits, 1 / temp)
+                    sum += action_probs[i]
 
             # renormalization
             action_probs = action_probs / sum
 
+        logging.debug("Probs: " + str(probs))
         logging.debug("Visits: " + str(visits))
         logging.debug("Qs: " + str(qs))
         logging.debug("Terminals: " + str(terminals))
+        logging.debug("_" * 20)
 
         return (action_probs, init_val)
     
@@ -202,7 +216,6 @@ class MCTS():
             node = node.children[action]
         
         reward, terminal = game.is_terminal(action)
-
         node.terminal = terminal
 
         # if not terminal

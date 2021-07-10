@@ -56,7 +56,7 @@ class Trainer():
             # make agent play its best moves after x turns
             turn += 1
             if (turn > self.params["exp_turns"]):
-                temp = 0.5
+                temp = 0
 
         logging.debug("Actions: " + str(actions))
         logging.debug("\n" + np.array_str(game.state))
@@ -76,7 +76,8 @@ class Trainer():
         old_model = keras.models.load_model("Models/v0", compile=False)
 
         params = copy.deepcopy(self.params)
-        params["timeout"] = 0.50
+        params["timeout"] = 1.0
+        params["temp"] = 0.0
 
         p2 = MCTS(old_model, params)
         p1 = MCTS(self.model, params)
@@ -146,7 +147,7 @@ def compile_model(model, params):
     args = params["training_args"]
     losses = {'output_1':prob_loss, 'output_2':value_loss}
     lossWeights={'output_1':0.7, 'output_2':0.3}
-    cyclical_learning_rate = CyclicalLearningRate(initial_learning_rate=args["lr_min"], maximal_learning_rate=args["lr_max"], step_size=(int(3 * params["maxQueueLen"] / args["batch_size"])), scale_fn=lambda x: 1 / (2.0 ** (x - 1)), scale_mode='cycle')
+    cyclical_learning_rate = CyclicalLearningRate(initial_learning_rate=args["lr_min"], maximal_learning_rate=args["lr_max"], step_size=(int(3 * (30 * params["num_eps"] * params["num_iters"]) / args["batch_size"])), scale_fn=lambda x: 1 / (2.0 ** (x - 1)), scale_mode='cycle')
     adam = keras.optimizers.Adam(learning_rate=cyclical_learning_rate)
     model.compile(optimizer=adam, loss=losses, loss_weights=lossWeights)
     return model

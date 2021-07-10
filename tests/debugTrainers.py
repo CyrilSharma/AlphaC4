@@ -20,8 +20,8 @@ class OverfitTrainer(Trainer):
         self.rewards = rewards
     
     def run_episode(self):
-        game = C4()
-        final_probs, state_val = self.tree.final_probs(game, self.params["temp"])
+        final_probs = np.zeros(self.rows)
+        final_probs[0] = 1.0
 
         # update memory
         return [(copy.deepcopy(self.states[i]).reshape(self.rows, self.columns, 1), final_probs, self.rewards[i]) for i in range(len(self.states)) for j in range(self.params["training_args"]["batch_size"])]

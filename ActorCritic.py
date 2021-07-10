@@ -9,7 +9,7 @@ class ActorCritic(tf.keras.Model):
   """ Combined Actor-Critic network.
   The idea here is the information the common layers extract can and should be shared with both the actor and the critic """
 
-  def __init__(self, filters=96):
+  def __init__(self, filters=192):
     """Initialize."""
     super().__init__()
     self.tower_height = 15
@@ -24,7 +24,7 @@ class ActorCritic(tf.keras.Model):
     return self.actor(x), self.critic(x)
 
 class ResidualBlock(keras.layers.Layer):
-    def __init__(self, filters=96):
+    def __init__(self, filters=192):
         super().__init__()
         self.conv1 = layers.Conv2D(filters, kernel_size=(3,3), padding="same", data_format="channels_last", input_shape=(1,6,7,1))
         # self.batch_n1 = layers.BatchNormalization(axis=3)
