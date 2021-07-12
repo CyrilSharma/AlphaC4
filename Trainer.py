@@ -11,12 +11,12 @@ from Tournament import Tournament
 from C4 import C4
 from matplotlib import pyplot as plt
 from Evaluate import Evaluate
-from tensorflow_addons.optimizers import CyclicalLearningRate
 import copy
 import sys
 import logging
+import datetime
 
-logging.basicConfig(filename='trainer.log', filemode='w', level=logging.DEBUG)
+logging.basicConfig(filename='logs/trainer.log', filemode='w', level=logging.DEBUG)
 logging.info("Starting Training")
 
 class Trainer():
@@ -67,10 +67,11 @@ class Trainer():
 
     def train(self, training_data, args):
         """Runs a model training step."""
-        
+        log_dir = "logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+        tb_callback = tf.keras.callbacks.TensorBoard(log_dir=log_dir, histogram_freq=3)
         boards, probs, values = list(zip(*training_data))
         self.model.fit(x=np.stack(boards), y=[np.stack(probs), np.stack(values)], batch_size=args["batch_size"], 
-        epochs=args["epochs"])
+        epochs=args["epochs"], callbacks=[tb_callback])
     
     def test(self):
         old_model = keras.models.load_model("Models/v0", compile=False)
@@ -120,6 +121,9 @@ class Trainer():
             self.model.save(f"Models/v0", save_format='tf')
             self.train(trainingData, self.params["training_args"])
             self.test()
+
+            # reset model's optimizer for next iteration
+            compile_model(self.model, self.params)
         
         self.model.save(f"Models/{model_name}", save_format='tf')
 
@@ -147,8 +151,8 @@ def compile_model(model, params):
     args = params["training_args"]
     losses = {'output_1':prob_loss, 'output_2':value_loss}
     lossWeights={'output_1':0.7, 'output_2':0.3}
-    cyclical_learning_rate = CyclicalLearningRate(initial_learning_rate=args["lr_min"], maximal_learning_rate=args["lr_max"], step_size=(int(3 * (30 * params["num_eps"] * params["num_iters"]) / args["batch_size"])), scale_fn=lambda x: 1 / (2.0 ** (x - 1)), scale_mode='cycle')
-    adam = keras.optimizers.Adam(learning_rate=cyclical_learning_rate)
+    schedule = tf.keras.optimizers.schedules.ExponentialDecay(initial_learning_rate=args["lr_init"], decay_steps=args["decay_steps"], decay_rate=args["lr_decay"])
+    adam = keras.optimizers.Adam(learning_rate=schedule)
     model.compile(optimizer=adam, loss=losses, loss_weights=lossWeights)
     return model
 
@@ -157,6 +161,6 @@ def prob_loss(y_true, y_pred):
     return loss
 
 def value_loss(y_true, y_pred):
-    mse = tf.keras.losses.MeanSquaredError(reduction=tf.keras.losses.Reduction.NONE)
+    mse = tf.keras.losses.MeanSquaredError() # reduction=tf.keras.losses.Reduction.NONE)
     loss = mse(y_true, y_pred)
     return loss

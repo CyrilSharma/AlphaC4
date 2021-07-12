@@ -10,3 +10,4 @@ cmake-build-debug/
 lib/
 build/
 src/utils.egg-info
+logs/

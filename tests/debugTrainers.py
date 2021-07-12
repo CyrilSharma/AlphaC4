@@ -20,11 +20,11 @@ class OverfitTrainer(Trainer):
         self.rewards = rewards
     
     def run_episode(self):
-        final_probs = np.zeros(self.rows)
+        final_probs = np.zeros(self.columns)
         final_probs[0] = 1.0
 
         # update memory
-        return [(copy.deepcopy(self.states[i]).reshape(self.rows, self.columns, 1), final_probs, self.rewards[i]) for i in range(len(self.states)) for j in range(self.params["training_args"]["batch_size"])]
+        return [(copy.deepcopy(self.states[i]).reshape(self.rows, self.columns, 1), final_probs, self.rewards[i]) for i in range(len(self.states)) for j in range(256)]
     
     def training_loop(self, model_name, graphs=True):
 
@@ -49,6 +49,29 @@ class OverfitTrainer(Trainer):
             shuffle(trainingData)
 
             self.train(trainingData, self.params["training_args"])
+        
+        self.model.save(f"Models/{model_name}", save_format='tf')
+
+class SupervisedTrainer(Trainer):
+    def __init__(self, model, params, config, data):
+        super().__init__(model, params, config)
+        self.data = data
+    
+    def training_loop(self, model_name, graphs=True):
+
+        episodes = self.params["num_eps"]
+        iterations = self.params["num_iters"]
+
+        for j in range(iterations):
+
+            trainingData = []
+            for e in self.data:
+                # maybe extend, depends how we format the data
+                trainingData.append(e)
+            shuffle(trainingData)
+
+            self.train(trainingData, self.params["training_args"])
+            self.test()
         
         self.model.save(f"Models/{model_name}", save_format='tf')
 

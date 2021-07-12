@@ -10,13 +10,15 @@
     "timeout": 1.5,
     "num_iters": 40,
     "prob_scale": 0.5,
-    "num_eps": 50,
-    "maxQueueLen": 5000,
-    "numStoredIters": 3,
+    "num_eps": 100,
+    "maxQueueLen": 10000,
+    "numStoredIters": 7,
+    "states_per_ep": 30,
     "training_args": {
         "epochs": 10,
-        "batch_size": 256,
-        "lr_min": 0.000001,
-        "lr_max": 0.00001
+        "batch_size": 64,
+        "lr_init": 0.00001,
+        "lr_decay": 0.90,
+        "decay_steps": 250
     }
 }

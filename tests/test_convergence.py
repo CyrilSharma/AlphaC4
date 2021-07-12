@@ -5,14 +5,21 @@ import numpy as np
 import tensorflow as tf
 import copy
 from tensorflow import keras
+from helpers import render
+import logging
 
 def main():
     with open('parameters.json') as file:
         params = json.load(file)
 
     params["num_iters"] = 1
-    params["num_eps"] = 10
-    params["timeout"] = 0.3
+    params["num_eps"] = 30
+    params["maxQueueLen"] = 10000
+    params["training_args"]["epochs"] = 4
+    params["numStoredIters"] = 1
+    params["states_per_ep"] = 256
+
+
     with open('config.json') as file:
         config = json.load(file)
     
@@ -52,12 +59,14 @@ def main():
     trainer.training_loop('test')
 
     model = keras.models.load_model('Models/test', custom_objects={"ActorCritic": ActorCritic}, compile=False)
+    input1 = np.stack([copy.deepcopy(states[0]).reshape(6, 7, 1) for j in range(1)]) # (params["training_args"]["batch_size"])])
+    input2 = np.stack([copy.deepcopy(states[1]).reshape(6, 7, 1) for j in range(1)]) # params["training_args"]["batch_size"])])
 
-    action_vals, val = model(tf.convert_to_tensor(copy.deepcopy(state2).reshape(1, 6, 7, 1), dtype=tf.float32), training=False)
+    action_vals, val = model(input1)
     print(tf.nn.softmax(action_vals))
     print(val)
 
-    action_vals, val = model(tf.convert_to_tensor(copy.deepcopy(state3).reshape(1, 6, 7, 1), dtype=tf.float32), training=False)
+    action_vals, val = model(input2, training=False)
     print(tf.nn.softmax(action_vals))
     print(val)
 
