@@ -143,38 +143,20 @@ class MCTS():
         qs = []
         terminals = []
 
-        # this chooses whatever action had the most visits if the temp was 0
-        if (temp - 1e-3 < 0.001):
-            max_count = 0
-            best_action = 0
-            for i in range(self.dims[1]):
-                probs.append("{:.2f}".format(round(children[i].prob, 2)) if children[i] is not None else "Illegal")
-                visits.append(children[i].visits if children[i] is not None else "Illegal")
-                qs.append("{:.2f}".format(round(children[i].q, 2)) if children[i] is not None else "Illegal")
-                terminals.append(children[i].terminal if children[i] is not None else "Illegal")
+        # explore
+        sum = 0
+        for i in range(self.dims[1]):
+            probs.append("{:.2f}".format(round(children[i].prob,2)) if children[i] is not None else "Illegal")
+            visits.append(children[i].visits if children[i] is not None else "Illegal")
+            qs.append("{:.2f}".format(round(children[i].q, 2)) if children[i] is not None else "Illegal")
+            terminals.append(children[i].terminal if children[i] is not None else "Illegal")
 
-                # if child exists and number of child visits is greater then the max
-                if (children[i] is not None and children[i].visits > max_count):
-                    max_count = children[i].visits
-                    best_action = i
+            if (children[i] is not None and children[i].visits > 0):
+                action_probs[i] = pow(children[i].visits, 1 / temp)
+                sum += action_probs[i]
 
-            action_probs[best_action] = 1.
-
-        else:
-            # explore
-            sum = 0
-            for i in range(self.dims[1]):
-                probs.append("{:.2f}".format(round(children[i].prob,2)) if children[i] is not None else "Illegal")
-                visits.append(children[i].visits if children[i] is not None else "Illegal")
-                qs.append("{:.2f}".format(round(children[i].q, 2)) if children[i] is not None else "Illegal")
-                terminals.append(children[i].terminal if children[i] is not None else "Illegal")
-
-                if (children[i] is not None and children[i].visits > 0):
-                    action_probs[i] = pow(children[i].visits, 1 / temp)
-                    sum += action_probs[i]
-
-            # renormalization
-            action_probs = action_probs / sum
+        # renormalization
+        action_probs = action_probs / sum
 
         logging.debug("Probs: " + str(probs))
         logging.debug("Visits: " + str(visits))

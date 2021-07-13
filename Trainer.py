@@ -11,13 +11,14 @@ from Tournament import Tournament
 from C4 import C4
 from matplotlib import pyplot as plt
 from Evaluate import Evaluate
+from Window import Window
 import copy
 import sys
 import logging
 import datetime
 
 logging.basicConfig(filename='logs/trainer.log', filemode='w', level=logging.DEBUG)
-logging.info("Starting Training")
+logging.info("Starting new training session")
 
 class Trainer():
     def __init__(self, model: ActorCritic, params, config):
@@ -45,18 +46,18 @@ class Trainer():
             # store value, and removes size 1 dimensions
             episode_memory.append([copy.deepcopy(game.state).reshape((self.rows,self.columns,1)) * game.player, final_probs, None, game.player])
 
-            # choose action and modify state accordingly
-            action = np.random.choice([0,1,2,3,4,5,6], p=final_probs)
+            # choose action randomly if temp is high, else choose best action
+            if turn > self.params["exp_turns"]:
+                action = np.random.choice([0,1,2,3,4,5,6], p=final_probs)
+            else:
+                action = np.argmax(final_probs)
+
             actions.append(action)
             game.move(action)
             self.tree.shift_root(action)
 
             reward, terminal = game.is_terminal(action)
-
-            # make agent play its best moves after x turns
             turn += 1
-            if (turn > self.params["exp_turns"]):
-                temp = 0
 
         logging.debug("Actions: " + str(actions))
         logging.debug("\n" + np.array_str(game.state))
@@ -78,7 +79,6 @@ class Trainer():
 
         params = copy.deepcopy(self.params)
         params["timeout"] = 1.0
-        params["temp"] = 0.0
 
         p2 = MCTS(old_model, params)
         p1 = MCTS(self.model, params)
@@ -100,6 +100,7 @@ class Trainer():
 
         episodes = self.params["num_eps"]
         iterations = self.params["num_iters"]
+        window = Window(self.params["StoredIters"])
 
         for j in range(iterations):
             iterMemory = deque([], maxlen=self.params["maxQueueLen"])
@@ -110,7 +111,8 @@ class Trainer():
             
             self.history.append(iterMemory)
 
-            if len(self.history) > self.params["numStoredIters"]:
+            # remove old data
+            if len(self.history) > window.size(j):
                 self.history.pop(0)
             
             trainingData = []

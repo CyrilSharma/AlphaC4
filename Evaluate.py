@@ -24,15 +24,10 @@ def getData(filename):
             data.append(dict)
     return data
 
-def Evaluate(samples, agent: MCTS, sample_spacing=8, random=False):
+def Evaluate(samples, agent: MCTS, sample_spacing=8):
     data = getData('c4-eval.txt')
 
-    if random:
-        rng = default_rng()
-        # grabs 100 unique samples
-        subset = rng.choice(data, size=samples,replace=False)
-    else:
-        subset = data[0:samples*sample_spacing:sample_spacing]
+    subset = data[0:samples*sample_spacing:sample_spacing]
     
     moves = 0
     state_error = 0
@@ -54,8 +49,7 @@ def Evaluate(samples, agent: MCTS, sample_spacing=8, random=False):
         game.state = board
 
         logging.debug("\n" + np.array_str(game.state))
-        final_probs, state_val = agent.final_probs(game, 0)
-        #agent_move = np.random.choice([0,1,2,3,4,5,6])
+        final_probs, state_val = agent.final_probs(game, 1)
         agent_move = np.argmax(final_probs)
         agent_moves[agent_move] += 1
 
@@ -81,7 +75,6 @@ def Evaluate(samples, agent: MCTS, sample_spacing=8, random=False):
 
         mse = (state_val - score) ** 2
         state_error += (mse - state_error) / (moves + 1)
-        
         moves += 1
     
     print(f"Agent Moves: {agent_moves}")

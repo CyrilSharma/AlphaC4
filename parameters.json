@@ -7,18 +7,23 @@
     "epsilon": 0.40,
     "num_sims": 800,
     "exp_turns": 12,
-    "timeout": 1.5,
+    "timeout": 0.5,
     "num_iters": 40,
-    "prob_scale": 0.5,
     "num_eps": 100,
     "maxQueueLen": 10000,
     "numStoredIters": 7,
+    "StoredIters": [
+        [4, 2],
+        [9, 4],
+        [15, 6],
+        [0, 10]
+    ],
     "states_per_ep": 30,
     "training_args": {
         "epochs": 10,
         "batch_size": 64,
         "lr_init": 0.00001,
-        "lr_decay": 0.90,
-        "decay_steps": 250
+        "lr_decay": 0.75,
+        "decay_steps": 100
     }
 }

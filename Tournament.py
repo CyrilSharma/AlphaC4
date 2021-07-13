@@ -14,7 +14,7 @@ def match(p1: MCTS, p2: MCTS, swap):
 
     while not terminal:
         # get data
-        final_probs, state_val = trees[turn % 2].final_probs(game, 0)
+        final_probs, state_val = trees[turn % 2].final_probs(game, 1)
 
         action = np.argmax(final_probs)
         game.move(action)

@@ -16,9 +16,4 @@ def main():
 
     trainer = Trainer(model, params, config)
     trainer.training_loop(model_name)
-
-
-    # tree = MCTS(model, 0.01, 3)
-    # good_moves, perfect_moves, mse = Evaluate(1000, tree, sample_spacing=1)
-    # print(f"good_moves: {good_moves * 100}% \nperfect_moves: {perfect_moves * 100}% \nstate mse: {mse}")
 main()
