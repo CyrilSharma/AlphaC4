@@ -47,10 +47,10 @@ class Trainer():
             episode_memory.append([copy.deepcopy(game.state).reshape((self.rows,self.columns,1)) * game.player, final_probs, None, game.player])
 
             # choose action randomly if temp is high, else choose best action
-            if turn > self.params["exp_turns"]:
-                action = np.random.choice([0,1,2,3,4,5,6], p=final_probs)
-            else:
+            if turn >= (self.params["exp_turns"] - 1):
                 action = np.argmax(final_probs)
+            else:
+                action = np.random.choice([0,1,2,3,4,5,6], p=final_probs)
 
             actions.append(action)
             game.move(action)
@@ -63,13 +63,14 @@ class Trainer():
         logging.debug("\n" + np.array_str(game.state))
         logging.debug(f"Winner: {-1 * reward * game.player}")
         # update memory
-        return [(ep[0], ep[1], -1 * reward * game.player * ep[3]) for ep in episode_memory]
+        new_mem = [(ep[0], ep[1], reward * game.player * ep[3]) for ep in episode_memory]
+        return new_mem
 
 
     def train(self, training_data, args):
         """Runs a model training step."""
         log_dir = "logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-        tb_callback = tf.keras.callbacks.TensorBoard(log_dir=log_dir, histogram_freq=3)
+        tb_callback = tf.keras.callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1)
         boards, probs, values = list(zip(*training_data))
         self.model.fit(x=np.stack(boards), y=[np.stack(probs), np.stack(values)], batch_size=args["batch_size"], 
         epochs=args["epochs"], callbacks=[tb_callback])
@@ -83,6 +84,7 @@ class Trainer():
         p2 = MCTS(old_model, params)
         p1 = MCTS(self.model, params)
         
+        logging.info(f"Tournament starting")
         avg_reward = Tournament(p1, p2, self.params["numBattles"])
         self.battle_outcomes.append(avg_reward)
 
@@ -90,6 +92,7 @@ class Trainer():
 
         p1.reset()
 
+        logging.info(f"Evaluation starting")
         # note that the dataset is of size 1000
         good_moves, perfect_moves, mse = Evaluate(samples=100, agent=p1, sample_spacing=3)
         print(f"good_moves: {good_moves * 100}% \nperfect_moves: {perfect_moves * 100}% \nstate mse: {mse}")
@@ -103,8 +106,10 @@ class Trainer():
         window = Window(self.params["StoredIters"])
 
         for j in range(iterations):
+            logging.info(f"Iteration {j}")
             iterMemory = deque([], maxlen=self.params["maxQueueLen"])
 
+            logging.info(f"Self Play starting")
             for t in tqdm(range(episodes), desc="Self Play"):
                 self.tree = MCTS(self.model, self.params)
                 iterMemory += self.run_episode()
@@ -159,7 +164,7 @@ def compile_model(model, params):
     return model
 
 def prob_loss(y_true, y_pred):
-    loss = tf.nn.softmax_cross_entropy_with_logits(labels=y_true, logits=y_pred)
+    loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=y_true, logits=y_pred))
     return loss
 
 def value_loss(y_true, y_pred):

@@ -1,3 +1,4 @@
+import sys
 import numpy as np
 from numpy.random import default_rng
 import time
@@ -43,7 +44,7 @@ class Node():
         if (not self.expanded):
             for i in range(len(self.children)):
                 # illegal action
-                if abs(child_probs[i]) < np.finfo(np.float32).eps:
+                if abs(child_probs[i]) < sys.float_info.min:
                     continue
 
                 self.children[i] = Node(parent=self, action=i, prob=child_probs[i], num_actions=len(self.children))
@@ -52,7 +53,7 @@ class Node():
         else:
             for i in range(len(self.children)):
                 # illegal action
-                if abs(child_probs[i]) < np.finfo(np.float32).eps:
+                if abs(child_probs[i]) < sys.float_info.min:
                     continue
 
                 if (self.children[i] is not None):
@@ -118,37 +119,33 @@ class MCTS():
         # initial reading of state value is stored for testing purposes.
         init_probs, init_val = self.predict(C4)
         probs = self.add_noise(C4, init_probs)
-        
         # add noise to root node only
         self.root.expand(probs)
 
-        # initialize probs
-        action_probs = np.zeros(self.num_actions)
+        logging.debug("Inital Root Probs: " + str(["{:.3e}".format(elem) for elem in init_probs]))
+        logging.debug("Noisy Root Probs: " + str(["{:.3e}".format(elem) for elem in probs]))
 
+        # don't spend more then self.timeout seconds on this and don't do more then simulations than self.num_sims
         t_0 = time.time()
         t_end = time.time() + self.timeout
         i = 0
-
-        # don't spend more then self.timeout seconds on this and don't do more then simulations than self.num_sims
         while time.time() < t_end and i < self.num_sims:
             game = copy.deepcopy(C4)
             self.update(game)
             i += 1
 
-        children = self.root.children
-
         # for logging purposes
-        probs = []
         visits = []
         qs = []
         terminals = []
 
         # explore
+        action_probs = np.zeros(self.num_actions)
+        children = self.root.children
         sum = 0
         for i in range(self.dims[1]):
-            probs.append("{:.2f}".format(round(children[i].prob,2)) if children[i] is not None else "Illegal")
             visits.append(children[i].visits if children[i] is not None else "Illegal")
-            qs.append("{:.2f}".format(round(children[i].q, 2)) if children[i] is not None else "Illegal")
+            qs.append("{:.3e}".format(children[i].q) if children[i] is not None else "Illegal")
             terminals.append(children[i].terminal if children[i] is not None else "Illegal")
 
             if (children[i] is not None and children[i].visits > 0):
@@ -158,7 +155,7 @@ class MCTS():
         # renormalization
         action_probs = action_probs / sum
 
-        logging.debug("Probs: " + str(probs))
+        logging.debug("Final Probs: " + np.array_str(action_probs))
         logging.debug("Visits: " + str(visits))
         logging.debug("Qs: " + str(qs))
         logging.debug("Terminals: " + str(terminals))
@@ -208,6 +205,7 @@ class MCTS():
         else:
             print("", end="")
 
+        # print("Reward: " + str(reward))
         node.backup(reward)
         return
 

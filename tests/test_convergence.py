@@ -17,7 +17,6 @@ def main():
     params["maxQueueLen"] = 10000
     params["training_args"]["epochs"] = 4
     params["numStoredIters"] = 1
-    params["states_per_ep"] = 256
 
 
     with open('config.json') as file:

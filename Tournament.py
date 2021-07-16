@@ -6,12 +6,13 @@ from tqdm import tqdm
 import logging
 
 def match(p1: MCTS, p2: MCTS, swap):
+    logging.debug(f"New NN Player: {1 if swap == 0 else -1}")
+
     game = C4()
     trees = [p1, p2]
-
     turn = swap
+    
     terminal = False
-
     while not terminal:
         # get data
         final_probs, state_val = trees[turn % 2].final_probs(game, 1)
@@ -29,10 +30,9 @@ def match(p1: MCTS, p2: MCTS, swap):
         outcome = reward * game.player * -1
     else:
         outcome = reward * game.player
+
     logging.debug("\n" + np.array_str(game.state))
     logging.debug(f"Outcome: {outcome}")
-    logging.debug(f"Swap: {swap}")
-
     return outcome
 
 def Tournament(p1: MCTS, p2: MCTS, episodes):

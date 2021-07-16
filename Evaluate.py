@@ -73,7 +73,7 @@ def Evaluate(samples, agent: MCTS, sample_spacing=8):
         else:
             score = 0
 
-        mse = (state_val - score) ** 2
+        mse = (state_val * -1 - score) ** 2
         state_error += (mse - state_error) / (moves + 1)
         moves += 1
     
@@ -91,7 +91,7 @@ if __name__ == "__main__":
     with open('parameters.json') as file:
         params = json.load(file)
     params["timeout"] = 2.0
-    model = keras.models.load_model("Models/first_model", compile=False)
+    model = keras.models.load_model("Models/v0", compile=False)
     agent = MCTS(model, params)
     good, perfect, state_error = Evaluate(800, agent, sample_spacing=1)
     print(f"Good Moves: {good}")
