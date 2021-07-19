@@ -131,9 +131,12 @@ class Trainer():
 
             # reset model's optimizer for next iteration
             compile_model(self.model, self.params)
+
+            # save model so training can be interrupted easily
+            if (j % 5) == 0:
+                self.model.save(f"Models/{model_name}", save_format='tf')
         
         self.model.save(f"Models/{model_name}", save_format='tf')
-
         
         if graphs:
             plt.title("Battle Outcomes") 

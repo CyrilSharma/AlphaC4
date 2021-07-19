@@ -12,7 +12,7 @@ class ActorCritic(tf.keras.Model):
   def __init__(self, filters=128):
     """Initialize."""
     super().__init__()
-    self.tower_height = 15
+    self.tower_height = 20
     self.common = [ResidualBlock(filters) for i in range(self.tower_height)]
     self.actor = PolicyBlock()
     self.critic = ValueBlock()

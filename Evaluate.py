@@ -91,7 +91,7 @@ if __name__ == "__main__":
     with open('parameters.json') as file:
         params = json.load(file)
     params["timeout"] = 2.0
-    model = keras.models.load_model("Models/v0", compile=False)
+    model = keras.models.load_model("Models/second_model", compile=False)
     agent = MCTS(model, params)
     good, perfect, state_error = Evaluate(800, agent, sample_spacing=1)
     print(f"Good Moves: {good}")

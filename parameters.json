@@ -3,7 +3,7 @@
     "numBattles": 10,
     "c_puct": 3.0,
     "c": 0.001,
-    "dirichlet": 1.5,
+    "dirichlet": 2.0,
     "epsilon": 0.25,
     "num_sims": 800,
     "exp_turns": 12,
